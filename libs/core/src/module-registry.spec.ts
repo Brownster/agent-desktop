@@ -13,7 +13,7 @@ import {
   type ModuleMetadata,
   type IModule,
 } from './base-module';
-import { ConfigService } from '@agent-desktop/config';
+import { ConfigService, ConfigSource } from '@agent-desktop/config';
 import { createLogger } from '@agent-desktop/logging';
 import type { CustomerID, ModuleID, ModuleConfig } from '@agent-desktop/types';
 
@@ -586,6 +586,8 @@ describe('ModuleRegistry', () => {
         key: 'modules.test-module.enabled',
         newValue: false,
         oldValue: true,
+        source: ConfigSource.OVERRIDE,
+        timestamp: new Date(),
       });
       
       expect(mockLogger.info).toHaveBeenCalledWith(
@@ -626,6 +628,8 @@ describe('ModuleRegistry', () => {
         key: 'modules.test-module.position',
         newValue: 'sidebar',
         oldValue: 'main',
+        source: ConfigSource.OVERRIDE,
+        timestamp: new Date(),
       });
 
       expect(mockLogger.warn).toHaveBeenCalledWith(
