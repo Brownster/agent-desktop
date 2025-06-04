@@ -54,6 +54,7 @@ export interface WebSocketOptions {
   readonly heartbeatInterval: number;
   readonly connectionTimeout: number;
   readonly enableCompression: boolean;
+  readonly maxQueueSize: number;
 }
 
 /**
@@ -66,6 +67,7 @@ const DEFAULT_WEBSOCKET_OPTIONS: WebSocketOptions = {
   heartbeatInterval: 30000,
   connectionTimeout: 10000,
   enableCompression: true,
+  maxQueueSize: 100,
 };
 
 /**
@@ -79,10 +81,12 @@ export class ConfigWebSocketService {
   private heartbeatTimer?: NodeJS.Timeout;
   private readonly subscriptions = new Map<string, Set<(event: ConfigChangeEvent) => void>>();
   private readonly messageQueue: WebSocketMessage[] = [];
+  private readonly maxQueueSize: number;
   private isConnected = false;
 
   constructor(options: Partial<WebSocketOptions> = {}, logger?: Logger) {
     this.options = { ...DEFAULT_WEBSOCKET_OPTIONS, ...options };
+    this.maxQueueSize = this.options.maxQueueSize;
     if (logger) {
       this.logger = logger.createChild('ConfigWebSocketService');
     } else {
@@ -394,6 +398,19 @@ export class ConfigWebSocketService {
   }
 
   /**
+   * Enqueue a message respecting the maximum queue size
+   */
+  private enqueueMessage(message: WebSocketMessage): void {
+    if (this.messageQueue.length >= this.maxQueueSize) {
+      this.messageQueue.shift();
+      this.logger.warn('Message queue full, dropping oldest message', {
+        maxQueueSize: this.maxQueueSize,
+      });
+    }
+    this.messageQueue.push(message);
+  }
+
+  /**
    * Send WebSocket message
    */
   private sendMessage(message: WebSocketMessage): void {
@@ -409,18 +426,18 @@ export class ConfigWebSocketService {
           type: message.type,
           error: error instanceof Error ? error.message : String(error),
         });
-        
+
         // Queue message for retry
-        this.messageQueue.push(message);
+        this.enqueueMessage(message);
       }
     } else {
       this.logger.debug('WebSocket not connected, queueing message', {
         type: message.type,
         id: message.id,
       });
-      
+
       // Queue message for when connection is established
-      this.messageQueue.push(message);
+      this.enqueueMessage(message);
     }
   }
 
