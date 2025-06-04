@@ -33,12 +33,11 @@ export interface IConfigStore {
 }
 
 /**
- * DynamoDB configuration store.
+ * DynamoDB configuration store using AWS SDK v3.
  *
- * // TODO: AWS SDK INTEGRATION
- * // This is currently a MOCK implementation.
- * // Replace mock logic with actual AWS SDK calls for DynamoDB operations.
- * // Ensure appropriate error handling, retry mechanisms, and IAM permissions.
+ * All operations are performed against DynamoDB with retries enabled via the
+ * SDK's built in retry strategy. Errors caused by missing IAM permissions are
+ * detected and surfaced with helpful messages.
  */
 export class DynamoDBConfigStore implements IConfigStore {
   private readonly tableName: string;
@@ -74,6 +73,23 @@ export class DynamoDBConfigStore implements IConfigStore {
     });
   }
 
+  private formatDynamoError(action: string, error: unknown): Error {
+    if (error && typeof error === 'object') {
+      const name = (error as { name?: string }).name;
+      if (
+        name === 'AccessDeniedException' ||
+        name === 'UnrecognizedClientException' ||
+        name === 'MissingAuthenticationToken' ||
+        name === 'CredentialsError'
+      ) {
+        return new Error(
+          `Access denied while attempting to ${action}. Verify IAM permissions.`
+        );
+      }
+    }
+    return error instanceof Error ? error : new Error(String(error));
+  }
+
   /**
    * Get customer configuration from DynamoDB
    */
@@ -102,13 +118,13 @@ export class DynamoDBConfigStore implements IConfigStore {
       });
       return success(Item as CustomerConfig);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const err = this.formatDynamoError('get customer configuration', error);
       this.logger.error('Failed to get customer configuration from DynamoDB', {
         customerId,
-        error: errorMessage,
-        stack: error instanceof Error ? error.stack : undefined
+        error: err.message,
+        stack: err.stack,
       });
-      return failure(error instanceof Error ? error : new Error(errorMessage));
+      return failure(err);
     }
   }
 
@@ -142,13 +158,13 @@ export class DynamoDBConfigStore implements IConfigStore {
       });
       return success(undefined);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const err = this.formatDynamoError('save customer configuration', error);
       this.logger.error('Failed to save customer configuration to DynamoDB', {
         customerId: config.customer_id,
-        error: errorMessage,
-        stack: error instanceof Error ? error.stack : undefined
+        error: err.message,
+        stack: err.stack,
       });
-      return failure(error instanceof Error ? error : new Error(errorMessage));
+      return failure(err);
     }
   }
 
@@ -169,13 +185,13 @@ export class DynamoDBConfigStore implements IConfigStore {
       this.logger.info('Customer configuration deleted successfully', { customerId });
       return success(undefined);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const err = this.formatDynamoError('delete customer configuration', error);
       this.logger.error('Failed to delete customer configuration from DynamoDB', {
         customerId,
-        error: errorMessage,
-        stack: error instanceof Error ? error.stack : undefined
+        error: err.message,
+        stack: err.stack,
       });
-      return failure(error instanceof Error ? error : new Error(errorMessage));
+      return failure(err);
     }
   }
 
@@ -210,12 +226,12 @@ export class DynamoDBConfigStore implements IConfigStore {
       });
       return success(Items as CustomerConfig[]);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const err = this.formatDynamoError('list customer configurations', error);
       this.logger.error('Failed to list customer configurations from DynamoDB', {
-        error: errorMessage,
-        stack: error instanceof Error ? error.stack : undefined
+        error: err.message,
+        stack: err.stack,
       });
-      return failure(error instanceof Error ? error : new Error(errorMessage));
+      return failure(err);
     }
   }
 
@@ -242,14 +258,14 @@ export class DynamoDBConfigStore implements IConfigStore {
       this.logger.info('Module configuration retrieved successfully', { customerId, moduleId });
       return success(Item as ModuleConfig);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const err = this.formatDynamoError('get module configuration', error);
       this.logger.error('Failed to get module configuration', {
         customerId,
         moduleId,
-        error: errorMessage,
-        stack: error instanceof Error ? error.stack : undefined,
+        error: err.message,
+        stack: err.stack,
       });
-      return failure(error instanceof Error ? error : new Error(errorMessage));
+      return failure(err);
     }
   }
 
@@ -280,14 +296,14 @@ export class DynamoDBConfigStore implements IConfigStore {
       this.logger.info('Module configuration saved successfully', { customerId, moduleId: config.module_id });
       return success(undefined);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const err = this.formatDynamoError('save module configuration', error);
       this.logger.error('Failed to save module configuration', {
         customerId,
         moduleId: config.module_id,
-        error: errorMessage,
-        stack: error instanceof Error ? error.stack : undefined,
+        error: err.message,
+        stack: err.stack,
       });
-      return failure(error instanceof Error ? error : new Error(errorMessage));
+      return failure(err);
     }
   }
 
@@ -308,14 +324,14 @@ export class DynamoDBConfigStore implements IConfigStore {
       this.logger.info('Module configuration deleted successfully', { customerId, moduleId });
       return success(undefined);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const err = this.formatDynamoError('delete module configuration', error);
       this.logger.error('Failed to delete module configuration', {
         customerId,
         moduleId,
-        error: errorMessage,
-        stack: error instanceof Error ? error.stack : undefined
+        error: err.message,
+        stack: err.stack,
       });
-      return failure(error instanceof Error ? error : new Error(errorMessage));
+      return failure(err);
     }
   }
 }
