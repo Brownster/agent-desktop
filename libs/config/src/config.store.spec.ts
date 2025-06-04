@@ -1,5 +1,5 @@
 import { DynamoDBConfigStore } from './config.store';
-import { DynamoDBDocumentClient, GetCommand, PutCommand, DeleteCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, GetCommand, PutCommand, DeleteCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { mockClient } from 'aws-sdk-client-mock';
 import 'aws-sdk-client-mock-jest'; // For expect(mock).toHaveReceivedCommand()
 import { success, failure } from '@agent-desktop/types';
@@ -208,7 +208,7 @@ describe('DynamoDBConfigStore', () => {
 
     it('should return a list of customer configurations', async () => {
       const mockItems = [mockConfig1, mockConfig2];
-      ddbMock.on(ScanCommand).resolves({ Items: mockItems, Count: mockItems.length });
+      ddbMock.on(QueryCommand).resolves({ Items: mockItems, Count: mockItems.length });
 
       const result = await store.listCustomerConfigs();
 
@@ -217,12 +217,12 @@ describe('DynamoDBConfigStore', () => {
         expect(result.data).toEqual(mockItems);
         expect(result.data.length).toBe(2);
       }
-      expect(ddbMock).toHaveReceivedCommandWith(ScanCommand, {
+      expect(ddbMock).toHaveReceivedCommandWith(QueryCommand, {
         TableName: tableName,
-        FilterExpression: "begins_with(PK, :pk_prefix) AND SK = :sk_value",
+        IndexName: 'GSI1',
+        KeyConditionExpression: 'SK = :sk',
         ExpressionAttributeValues: {
-          ":pk_prefix": "CUSTOMER#",
-          ":sk_value": "CONFIG",
+          ':sk': 'CONFIG',
         },
       });
       expect(mockLogger.info).toHaveBeenCalledWith('Listing all customer configurations');
@@ -230,7 +230,7 @@ describe('DynamoDBConfigStore', () => {
     });
 
     it('should return an empty list if no configurations are found', async () => {
-      ddbMock.on(ScanCommand).resolves({ Items: [], Count: 0 });
+      ddbMock.on(QueryCommand).resolves({ Items: [], Count: 0 });
 
       const result = await store.listCustomerConfigs();
 
@@ -244,7 +244,7 @@ describe('DynamoDBConfigStore', () => {
 
     it('should return success with an empty list if Items is undefined in response (as per current code handling)', async () => {
        // This test reflects the current implementation detail where `!Items` leads to `success([])`
-       ddbMock.on(ScanCommand).resolves({ Items: undefined, Count: 0 });
+       ddbMock.on(QueryCommand).resolves({ Items: undefined, Count: 0 });
 
        const result = await store.listCustomerConfigs();
 
@@ -258,7 +258,7 @@ describe('DynamoDBConfigStore', () => {
 
     it('should return a failure on DynamoDB error during scan', async () => {
       const dbError = new Error('DynamoDB scan blew up');
-      ddbMock.on(ScanCommand).rejects(dbError);
+      ddbMock.on(QueryCommand).rejects(dbError);
 
       const result = await store.listCustomerConfigs();
 
@@ -273,320 +273,71 @@ describe('DynamoDBConfigStore', () => {
     });
   });
   describe('getModuleConfig', () => {
-    const mockCustomerId = 'custModGet123';
-    const mockModuleId = 'mod1';
-    const mockModule: ModuleConfig = {
-      module_id: mockModuleId,
-      name: 'Test Module 1',
-      version: '1.0',
-      settings: { enabled: true },
-    };
-    const mockCustomerConfig: CustomerConfig = {
-      customer_id: mockCustomerId,
-      version: 1,
-      modules: [mockModule, { module_id: 'mod2', name: 'Other Module', version: '1.0', settings: {} }],
-      name: 'Customer For Module Test',
-      region: 'eu-central-1',
-      integrations: {},
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+    const customerId = 'custModGet123';
+    const moduleId = 'mod1';
+    const mockModule: ModuleConfig = { module_id: moduleId, name: 'M1', version: '1', settings: {} } as any;
 
-    it('should retrieve a specific module configuration from a customer config', async () => {
-      // Mock getCustomerConfig to return the mockCustomerConfig
-      ddbMock.on(GetCommand, {
-        TableName: tableName,
-        Key: { PK: `CUSTOMER#${mockCustomerId}`, SK: 'CONFIG' },
-      }).resolves({ Item: mockCustomerConfig });
+    it('should retrieve a module', async () => {
+      ddbMock.on(GetCommand, { TableName: tableName, Key: { PK: `CUSTOMER#${customerId}`, SK: `MODULE#${moduleId}` } }).resolves({ Item: mockModule });
 
-      const result = await store.getModuleConfig(mockCustomerId, mockModuleId);
-
+      const result = await store.getModuleConfig(customerId, moduleId);
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(mockModule);
-      }
-      // Ensure getCustomerConfig was called
-      expect(ddbMock).toHaveReceivedCommandWith(GetCommand, {
-        TableName: tableName,
-        Key: { PK: `CUSTOMER#${mockCustomerId}`, SK: 'CONFIG' },
-      });
-      expect(mockLogger.info).toHaveBeenCalledWith('Getting module configuration', { customerId: mockCustomerId, moduleId: mockModuleId });
+      if (result.success) expect(result.data).toEqual(mockModule);
+      expect(ddbMock).toHaveReceivedCommandWith(GetCommand, { TableName: tableName, Key: { PK: `CUSTOMER#${customerId}`, SK: `MODULE#${moduleId}` } });
     });
 
-    it('should return failure if the module is not found in customer config', async () => {
-      ddbMock.on(GetCommand, {
-        TableName: tableName,
-        Key: { PK: `CUSTOMER#${mockCustomerId}`, SK: 'CONFIG' },
-      }).resolves({ Item: mockCustomerConfig }); // Customer config exists
-
-      const result = await store.getModuleConfig(mockCustomerId, 'nonExistentModule');
-
+    it('should return failure when not found', async () => {
+      ddbMock.on(GetCommand).resolves({ Item: undefined });
+      const result = await store.getModuleConfig(customerId, moduleId);
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.message).toBe('Module configuration not found: nonExistentModule');
-      }
-      expect(mockLogger.warn).toHaveBeenCalledWith('Module configuration not found for customer', { customerId: mockCustomerId, moduleId: 'nonExistentModule' });
     });
 
-    it('should return failure if customer configuration itself is not found', async () => {
-      // Mock getCustomerConfig to simulate customer not found
-      ddbMock.on(GetCommand, {
-        TableName: tableName,
-        Key: { PK: `CUSTOMER#${mockCustomerId}`, SK: 'CONFIG' },
-      }).resolves({ Item: undefined });
-
-      const result = await store.getModuleConfig(mockCustomerId, mockModuleId);
-
+    it('should handle DynamoDB errors', async () => {
+      const err = new Error('dberror');
+      ddbMock.on(GetCommand).rejects(err);
+      const result = await store.getModuleConfig(customerId, moduleId);
       expect(result.success).toBe(false);
-      if (!result.success) {
-        // Check message from getModuleConfig, which wraps the error from getCustomerConfig
-        expect(result.error.message).toContain('Failed to retrieve customer config for module fetching');
-        expect(result.error.message).toContain('Customer configuration not found');
-      }
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        'Failed to get customer configuration while trying to get module config',
-        expect.objectContaining({ customerId: mockCustomerId, moduleId: mockModuleId, error: 'Customer configuration not found' })
-      );
-    });
-
-    it('should return failure if customer config has no modules array', async () => {
-       const customerConfigNoModules: Partial<CustomerConfig> = { // Use Partial for easier mocking
-         customer_id: mockCustomerId,
-         version: 1,
-         // modules: undefined, // Explicitly undefined or missing
-         name: 'Customer No Modules',
-       };
-       ddbMock.on(GetCommand, {
-         TableName: tableName,
-         Key: { PK: `CUSTOMER#${mockCustomerId}`, SK: 'CONFIG' },
-       }).resolves({ Item: customerConfigNoModules as CustomerConfig }); // Cast as CustomerConfig
-
-       const result = await store.getModuleConfig(mockCustomerId, mockModuleId);
-
-       expect(result.success).toBe(false);
-       if (!result.success) {
-           expect(result.error.message).toBe(`Module configuration not found: ${mockModuleId}`);
-       }
-    });
-
-    it('should return failure if getCustomerConfig returns a DynamoDB error', async () => {
-      const dbError = new Error('DynamoDB error on getCustomerConfig');
-      ddbMock.on(GetCommand).rejects(dbError); // getCustomerConfig fails
-
-      const result = await store.getModuleConfig(mockCustomerId, mockModuleId);
-
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.message).toContain('Failed to retrieve customer config for module fetching');
-        expect(result.error.message).toContain(dbError.message);
-      }
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        'Failed to get customer configuration while trying to get module config',
-        expect.objectContaining({ customerId: mockCustomerId, moduleId: mockModuleId, error: dbError.message })
-      );
+      expect(result.error).toBe(err);
     });
   });
+
   describe('saveModuleConfig', () => {
-    const mockCustomerId = 'custModSave123';
-    const existingModuleId = 'modExist';
-    const newModuleId = 'modNew';
+    const customerId = 'custSave';
+    const moduleConfig: ModuleConfig = { module_id: 'm1', name: 'm1', version: '1', settings: {} } as any;
 
-    const mockExistingModule: ModuleConfig = {
-      module_id: existingModuleId, name: 'Existing Module', version: '1.0', settings: { data: 'old' }
-    };
-    const mockNewModule: ModuleConfig = {
-      module_id: newModuleId, name: 'New Module', version: '1.0', settings: { data: 'new' }
-    };
-    const updatedExistingModule: ModuleConfig = {
-      module_id: existingModuleId, name: 'Existing Module Updated', version: '1.1', settings: { data: 'updated' }
-    };
-
-    const baseCustomerConfig: CustomerConfig = {
-      customer_id: mockCustomerId, version: 1, modules: [mockExistingModule],
-      name: 'Customer For Module Save', region: 'eu-west-1', integrations: {},
-      createdAt: new Date(), updatedAt: new Date()
-    };
-
-    beforeEach(() => {
-       // Reset mocks for GetCommand and PutCommand for customer configs before each test in this suite
-       ddbMock.on(GetCommand, { TableName: tableName, Key: { PK: `CUSTOMER#${mockCustomerId}`, SK: 'CONFIG' } }).resolves(undefined); // Default to not found
-       ddbMock.on(PutCommand, { TableName: tableName }).resolves({}); // Default to success
-    });
-
-    it('should add a new module to an existing customer config', async () => {
-      // Mock getCustomerConfig to return a config
-      ddbMock.on(GetCommand, { TableName: tableName, Key: { PK: `CUSTOMER#${mockCustomerId}`, SK: 'CONFIG' } })
-        .resolves({ Item: JSON.parse(JSON.stringify(baseCustomerConfig)) }); // Deep copy
-
-      const result = await store.saveModuleConfig(mockCustomerId, mockNewModule);
-
+    it('should save module config', async () => {
+      ddbMock.on(PutCommand).resolves({});
+      const result = await store.saveModuleConfig(customerId, moduleConfig);
       expect(result.success).toBe(true);
-      expect(ddbMock).toHaveReceivedCommandWith(PutCommand, {
-        TableName: tableName,
-        Item: expect.objectContaining({
-          PK: `CUSTOMER#${mockCustomerId}`,
-          modules: expect.arrayContaining([
-            expect.objectContaining(mockExistingModule),
-            expect.objectContaining(mockNewModule)
-          ]),
-          updatedAt: expect.any(String),
-        }),
-      });
-      const putItem = ddbMock.commandCalls(PutCommand)[0].args[0].input.Item;
-      expect(putItem.modules.length).toBe(2);
-      expect(mockLogger.info).toHaveBeenCalledWith('Saving module configuration', expect.objectContaining({ customerId: mockCustomerId, moduleId: newModuleId }));
+      expect(ddbMock).toHaveReceivedCommandWith(PutCommand, { TableName: tableName, Item: expect.objectContaining({ PK: `CUSTOMER#${customerId}`, SK: `MODULE#${moduleConfig.module_id}` }) });
     });
 
-    it('should update an existing module in a customer config', async () => {
-      ddbMock.on(GetCommand, { TableName: tableName, Key: { PK: `CUSTOMER#${mockCustomerId}`, SK: 'CONFIG' } })
-        .resolves({ Item: JSON.parse(JSON.stringify(baseCustomerConfig)) }); // Deep copy
-
-      const result = await store.saveModuleConfig(mockCustomerId, updatedExistingModule);
-
-      expect(result.success).toBe(true);
-      const putArgs = ddbMock.commandCalls(PutCommand)[0].args[0].input;
-       expect(putArgs.Item.PK).toBe(`CUSTOMER#${mockCustomerId}`);
-       expect(putArgs.Item.modules.length).toBe(1);
-       expect(putArgs.Item.modules[0]).toEqual(updatedExistingModule); // Check the updated module
-       expect(putArgs.Item.updatedAt).toEqual(expect.any(String));
-      expect(mockLogger.info).toHaveBeenCalledWith('Module configuration saved successfully by updating customer config', expect.objectContaining({ customerId: mockCustomerId, moduleId: existingModuleId }));
-    });
-
-    it('should add a module if customer config has no modules array initially', async () => {
-       const configNoModules: CustomerConfig = {
-           ...baseCustomerConfig,
-           modules: undefined as any, // Simulate modules array not existing
-       };
-       ddbMock.on(GetCommand, { TableName: tableName, Key: { PK: `CUSTOMER#${mockCustomerId}`, SK: 'CONFIG' } })
-           .resolves({ Item: JSON.parse(JSON.stringify(configNoModules)) });
-
-       const result = await store.saveModuleConfig(mockCustomerId, mockNewModule);
-       expect(result.success).toBe(true);
-       const putArgs = ddbMock.commandCalls(PutCommand)[0].args[0].input;
-       expect(putArgs.Item.modules.length).toBe(1);
-       expect(putArgs.Item.modules[0]).toEqual(mockNewModule);
-    });
-
-    it('should return failure if getCustomerConfig fails', async () => {
-      ddbMock.on(GetCommand, { TableName: tableName, Key: { PK: `CUSTOMER#${mockCustomerId}`, SK: 'CONFIG' } })
-        .resolves({ Item: undefined }); // Simulate customer not found
-
-      const result = await store.saveModuleConfig(mockCustomerId, mockNewModule);
-
+    it('should fail on DynamoDB error', async () => {
+      const err = new Error('dberr');
+      ddbMock.on(PutCommand).rejects(err);
+      const result = await store.saveModuleConfig(customerId, moduleConfig);
       expect(result.success).toBe(false);
-      expect(result.error.message).toContain('Failed to retrieve customer config for module saving');
-      expect(mockLogger.warn).toHaveBeenCalledWith('Failed to get customer configuration while trying to save module config', expect.anything());
-    });
-
-    it('should return failure if saveCustomerConfig fails', async () => {
-      ddbMock.on(GetCommand, { TableName: tableName, Key: { PK: `CUSTOMER#${mockCustomerId}`, SK: 'CONFIG' } })
-        .resolves({ Item: JSON.parse(JSON.stringify(baseCustomerConfig)) }); // get succeeds
-      const saveError = new Error('Failed to save updated config');
-      ddbMock.on(PutCommand, { TableName: tableName }).rejects(saveError); // save fails
-
-      const result = await store.saveModuleConfig(mockCustomerId, mockNewModule);
-
-      expect(result.success).toBe(false);
-      expect(result.error.message).toContain('Failed to save customer config after module update');
-      expect(result.error.message).toContain(saveError.message);
-      expect(mockLogger.error).toHaveBeenCalledWith('Failed to save customer configuration after updating module', expect.anything());
+      expect(result.error).toBe(err);
     });
   });
+
   describe('deleteModuleConfig', () => {
-    const mockCustomerId = 'custModDel123';
-    const moduleToDeleteId = 'modDel';
-    const otherModuleId = 'modOther';
+    const customerId = 'custDel';
+    const moduleId = 'm1';
 
-    const mockModuleToDelete: ModuleConfig = {
-      module_id: moduleToDeleteId, name: 'Module To Delete', version: '1.0', settings: {}
-    };
-    const mockOtherModule: ModuleConfig = {
-      module_id: otherModuleId, name: 'Other Module', version: '1.0', settings: {}
-    };
-
-    const customerConfigWithModule: CustomerConfig = {
-      customer_id: mockCustomerId, version: 1, modules: [mockModuleToDelete, mockOtherModule],
-      name: 'Customer For Module Delete', region: 'us-east-2', integrations: {},
-      createdAt: new Date(), updatedAt: new Date()
-    };
-     const customerConfigWithoutModule: CustomerConfig = {
-       customer_id: mockCustomerId, version: 1, modules: [mockOtherModule],
-       name: 'Customer For Module Delete', region: 'us-east-2', integrations: {},
-       createdAt: new Date(), updatedAt: new Date()
-     };
-
-
-    beforeEach(() => {
-       // Reset mocks for GetCommand and PutCommand for customer configs before each test in this suite
-       ddbMock.on(GetCommand, { TableName: tableName, Key: { PK: `CUSTOMER#${mockCustomerId}`, SK: 'CONFIG' } }).resolves(undefined); // Default to not found
-       ddbMock.on(PutCommand, { TableName: tableName }).resolves({}); // Default to success
-    });
-
-    it('should successfully delete a module from a customer config', async () => {
-      ddbMock.on(GetCommand, { TableName: tableName, Key: { PK: `CUSTOMER#${mockCustomerId}`, SK: 'CONFIG' } })
-        .resolves({ Item: JSON.parse(JSON.stringify(customerConfigWithModule)) }); // Deep copy
-
-      const result = await store.deleteModuleConfig(mockCustomerId, moduleToDeleteId);
-
+    it('should delete module', async () => {
+      ddbMock.on(DeleteCommand).resolves({});
+      const result = await store.deleteModuleConfig(customerId, moduleId);
       expect(result.success).toBe(true);
-      expect(ddbMock).toHaveReceivedCommandWith(PutCommand, {
-        TableName: tableName,
-        Item: expect.objectContaining({
-          PK: `CUSTOMER#${mockCustomerId}`,
-          modules: [expect.objectContaining(mockOtherModule)], // Only other module should remain
-          updatedAt: expect.any(String),
-        }),
-      });
-      const putItem = ddbMock.commandCalls(PutCommand)[0].args[0].input.Item;
-      expect(putItem.modules.length).toBe(1);
-      expect(mockLogger.info).toHaveBeenCalledWith('Deleting module configuration', expect.objectContaining({ customerId: mockCustomerId, moduleId: moduleToDeleteId }));
+      expect(ddbMock).toHaveReceivedCommandWith(DeleteCommand, { TableName: tableName, Key: { PK: `CUSTOMER#${customerId}`, SK: `MODULE#${moduleId}` } });
     });
 
-    it('should return success if module to delete is not found (idempotency)', async () => {
-      ddbMock.on(GetCommand, { TableName: tableName, Key: { PK: `CUSTOMER#${mockCustomerId}`, SK: 'CONFIG' } })
-        .resolves({ Item: JSON.parse(JSON.stringify(customerConfigWithoutModule)) }); // Config doesn't have the module
-
-      const result = await store.deleteModuleConfig(mockCustomerId, moduleToDeleteId);
-
-      expect(result.success).toBe(true);
-      // Ensure PutCommand was NOT called as no change should be made
-      expect(ddbMock).not.toHaveReceivedCommand(PutCommand);
-      expect(mockLogger.warn).toHaveBeenCalledWith('Module to delete was not found in customer configuration', { customerId: mockCustomerId, moduleId: moduleToDeleteId });
-    });
-
-    it('should return success if customer config has no modules array (idempotency)', async () => {
-       const configNoModules: CustomerConfig = { ...customerConfigWithoutModule, modules: undefined as any };
-       ddbMock.on(GetCommand, { TableName: tableName, Key: { PK: `CUSTOMER#${mockCustomerId}`, SK: 'CONFIG' } })
-           .resolves({ Item: JSON.parse(JSON.stringify(configNoModules)) });
-
-       const result = await store.deleteModuleConfig(mockCustomerId, moduleToDeleteId);
-       expect(result.success).toBe(true);
-       expect(ddbMock).not.toHaveReceivedCommand(PutCommand);
-       expect(mockLogger.warn).toHaveBeenCalledWith('Modules array does not exist, cannot delete module', { customerId: mockCustomerId, moduleId: moduleToDeleteId });
-    });
-
-    it('should return failure if getCustomerConfig fails', async () => {
-      ddbMock.on(GetCommand, { TableName: tableName, Key: { PK: `CUSTOMER#${mockCustomerId}`, SK: 'CONFIG' } })
-        .resolves({ Item: undefined }); // Simulate customer not found
-
-      const result = await store.deleteModuleConfig(mockCustomerId, moduleToDeleteId);
-
+    it('should handle DynamoDB error', async () => {
+      const err = new Error('db');
+      ddbMock.on(DeleteCommand).rejects(err);
+      const result = await store.deleteModuleConfig(customerId, moduleId);
       expect(result.success).toBe(false);
-      expect(result.error.message).toContain('Failed to retrieve customer config for module deletion');
-      expect(ddbMock).not.toHaveReceivedCommand(PutCommand);
-    });
-
-    it('should return failure if saveCustomerConfig fails after deleting module', async () => {
-      ddbMock.on(GetCommand, { TableName: tableName, Key: { PK: `CUSTOMER#${mockCustomerId}`, SK: 'CONFIG' } })
-        .resolves({ Item: JSON.parse(JSON.stringify(customerConfigWithModule)) }); // get succeeds
-      const saveError = new Error('Failed to save after delete');
-      ddbMock.on(PutCommand, { TableName: tableName }).rejects(saveError); // save fails
-
-      const result = await store.deleteModuleConfig(mockCustomerId, moduleToDeleteId);
-
-      expect(result.success).toBe(false);
-      expect(result.error.message).toContain('Failed to save customer config after module deletion');
-      expect(result.error.message).toContain(saveError.message);
+      expect(result.error).toBe(err);
     });
   });
 });
