@@ -437,4 +437,22 @@ describe('Logger', () => {
       await multiLogger.destroy();
     });
   });
+
+  describe('runtime level changes', () => {
+    it('should update log level dynamically', async () => {
+      logger.setLevel(LogLevel.ERROR);
+      logger.debug('debug message');
+      logger.error('error message');
+      await logger.flush();
+
+      expect(mockTransport.write).toHaveBeenCalledTimes(1);
+      const entry = mockTransport.write.mock.calls[0][0];
+      expect(entry.level).toBe(LogLevel.ERROR);
+    });
+
+    it('should expose current log level', () => {
+      logger.setLevel(LogLevel.WARN);
+      expect(logger.getLevel()).toBe(LogLevel.WARN);
+    });
+  });
 });

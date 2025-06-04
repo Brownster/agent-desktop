@@ -54,6 +54,7 @@ export class LoggerFactory {
   private readonly config: LoggerFactoryConfig;
   private readonly loggers: Map<string, Logger> = new Map();
   private readonly transports: LogTransport[] = [];
+  private globalLevel: LogLevel;
   private isShuttingDown = false;
 
   /**
@@ -63,6 +64,7 @@ export class LoggerFactory {
    */
   private constructor(config: Partial<LoggerFactoryConfig> = {}) {
     this.config = { ...DEFAULT_FACTORY_CONFIG, ...config };
+    this.globalLevel = this.config.defaultLevel;
     this.initializeTransports();
     this.setupGracefulShutdown();
   }
@@ -97,7 +99,7 @@ export class LoggerFactory {
 
     // Create new logger
     const loggerConfig: LoggerConfig = {
-      level: this.config.defaultLevel,
+      level: this.globalLevel,
       context,
       transports: this.transports,
       enableConsole: this.config.enableConsole,
@@ -185,9 +187,10 @@ export class LoggerFactory {
    * @param level - New log level
    */
   setGlobalLevel(level: LogLevel): void {
-    // Note: This would require updating the Logger class to support
-    // dynamic level changes. For now, this is a placeholder.
-    console.warn('Dynamic log level changes not yet implemented');
+    this.globalLevel = level;
+    for (const logger of this.loggers.values()) {
+      logger.setLevel(level);
+    }
   }
 
   /**
