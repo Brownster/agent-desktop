@@ -60,7 +60,7 @@ export interface WebSocketOptions {
  * Default WebSocket options
  */
 const DEFAULT_WEBSOCKET_OPTIONS: WebSocketOptions = {
-  url: process.env.WS_ENDPOINT || 'wss://config-ws.example.com',
+  url: process.env['WS_ENDPOINT'] || 'wss://config-ws.example.com',
   reconnectInterval: 5000,
   maxReconnectAttempts: 10,
   heartbeatInterval: 30000,

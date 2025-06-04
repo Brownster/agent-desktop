@@ -11,7 +11,6 @@ import {
   type IModuleRegistry,
   type IModuleEventBus,
 } from './base-module';
-import { createLogger } from '@agent-desktop/logging';
 import type { ModuleConfig, ModuleID } from '@agent-desktop/types';
 
 // Test module implementation
@@ -64,7 +63,7 @@ describe('BaseModule', () => {
   let mockContext: ModuleContext;
 
   beforeEach(() => {
-    mockLogger = global.TestUtils?.createMockLogger() || {
+    mockLogger = (global as any).TestUtils?.createMockLogger() || {
       debug: jest.fn(),
       info: jest.fn(),
       warn: jest.fn(),
@@ -172,7 +171,7 @@ describe('BaseModule', () => {
 
       const metrics = await module.getMetrics();
       expect(metrics['test-metric']).toBe('test-value');
-      expect(metrics.count).toBe(42);
+      expect(metrics['count']).toBe(42);
     });
 
     it('should increment numeric metrics', async () => {
@@ -181,7 +180,7 @@ describe('BaseModule', () => {
       module.incrementMetricPublic('counter', 5);
 
       const metrics = await module.getMetrics();
-      expect(metrics.counter).toBe(7);
+      expect(metrics['counter']).toBe(7);
     });
 
     it('should include base metrics', async () => {
@@ -357,8 +356,8 @@ describe('BaseModule', () => {
         await module.onInitialize!(mockContext);
         const metrics = await module.getMetrics();
         
-        expect(metrics.startTime).toBeDefined();
-        expect(typeof metrics.startTime).toBe('number');
+        expect(metrics['startTime']).toBeDefined();
+        expect(typeof metrics['startTime']).toBe('number');
       });
     });
 
@@ -376,7 +375,7 @@ describe('BaseModule', () => {
         await module.onStart!(mockContext);
         
         const metrics = await module.getMetrics();
-        expect(metrics.startCount).toBe(2);
+        expect(metrics['startCount']).toBe(2);
       });
     });
 
@@ -393,7 +392,7 @@ describe('BaseModule', () => {
         await module.onStop!(mockContext);
         
         const metrics = await module.getMetrics();
-        expect(metrics.stopCount).toBe(1);
+        expect(metrics['stopCount']).toBe(1);
       });
     });
 
@@ -415,7 +414,7 @@ describe('BaseModule', () => {
         await module.onDestroy!(mockContext);
         
         const metrics = await module.getMetrics();
-        expect(metrics.test).toBeUndefined();
+        expect(metrics['test']).toBeUndefined();
       });
     });
   });
@@ -438,19 +437,19 @@ describe('BaseModule', () => {
         });
       }
 
-      async onInitialize(): Promise<any> {
+      override async onInitialize(_ctx: ModuleContext): Promise<any> {
         throw new Error('Initialization failed');
       }
 
-      async onStart(): Promise<any> {
+      override async onStart(_ctx: ModuleContext): Promise<any> {
         throw new Error('Start failed');
       }
 
-      async onStop(): Promise<any> {
+      override async onStop(_ctx: ModuleContext): Promise<any> {
         throw new Error('Stop failed');
       }
 
-      async onDestroy(): Promise<any> {
+      override async onDestroy(_ctx: ModuleContext): Promise<any> {
         throw new Error('Destroy failed');
       }
     }

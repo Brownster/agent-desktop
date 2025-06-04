@@ -150,7 +150,7 @@ describe('ConfigService', () => {
       configService.set('test.key', 'updated value');
 
       // Allow async watcher notifications to complete
-      await global.ConfigTestUtils.flushPromises();
+      await (global as any).ConfigTestUtils.flushPromises();
 
       expect(watcher).toHaveBeenCalledTimes(2);
       expect(watcher).toHaveBeenCalledWith(
@@ -180,7 +180,7 @@ describe('ConfigService', () => {
       configService.set('app.setting2', 'value2');
       configService.set('other.setting', 'value3');
 
-      await global.ConfigTestUtils.flushPromises();
+      await (global as any).ConfigTestUtils.flushPromises();
 
       expect(watcher).toHaveBeenCalledTimes(2); // Only app.* changes
       unwatch();
@@ -195,7 +195,7 @@ describe('ConfigService', () => {
 
       configService.set('test.key', 'value');
 
-      await global.ConfigTestUtils.flushPromises();
+      await (global as any).ConfigTestUtils.flushPromises();
 
       expect(errorWatcher).toHaveBeenCalled();
       expect(goodWatcher).toHaveBeenCalled();
@@ -212,7 +212,7 @@ describe('ConfigService', () => {
       unwatch();
       configService.set('test.key', 'value2');
 
-      await global.ConfigTestUtils.flushPromises();
+      await (global as any).ConfigTestUtils.flushPromises();
 
       expect(watcher).toHaveBeenCalledTimes(1);
     });
@@ -252,7 +252,7 @@ describe('ConfigService', () => {
       shortCacheService.get('expire.key'); // Cache it
 
       // Wait for cache to expire
-      await global.ConfigTestUtils.waitFor(100);
+      await (global as any).ConfigTestUtils.waitFor(100);
 
       // Should still get the value, but from source
       const value = shortCacheService.get('expire.key');
@@ -262,7 +262,7 @@ describe('ConfigService', () => {
 
   describe('validation', () => {
     it('should validate configuration objects', () => {
-      const validConfig = global.ConfigTestUtils.createMockConfig();
+      const validConfig = (global as any).ConfigTestUtils.createMockConfig();
       const result = configService.validate(validConfig);
 
       expect(result.isValid).toBe(true);
@@ -311,7 +311,7 @@ describe('ConfigService', () => {
     });
 
     it('should save valid customer configuration', async () => {
-      const config = global.ConfigTestUtils.createMockConfig({
+      const config = (global as any).ConfigTestUtils.createMockConfig({
         customer_id: 'save-test',
         name: 'Save Test Customer',
       });

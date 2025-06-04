@@ -14,7 +14,6 @@ import {
   type IModule,
 } from './base-module';
 import { ConfigService } from '@agent-desktop/config';
-import { createLogger } from '@agent-desktop/logging';
 import type { CustomerID, ModuleID, ModuleConfig } from '@agent-desktop/types';
 
 // Test module implementations
@@ -33,7 +32,7 @@ class FailingModule extends BaseModule {
     super(metadata);
   }
 
-  async onInitialize(): Promise<any> {
+  override async onInitialize(): Promise<any> {
     return {
       success: false,
       error: new Error('Initialization failed'),
@@ -50,7 +49,7 @@ describe('ModuleRegistry', () => {
   let dependentModule: TestModule;
 
   beforeEach(() => {
-    mockLogger = global.TestUtils?.createMockLogger() || {
+    mockLogger = (global as any).TestUtils?.createMockLogger() || {
       debug: jest.fn(),
       info: jest.fn(),
       warn: jest.fn(),
@@ -124,7 +123,7 @@ describe('ModuleRegistry', () => {
 
   describe('module registration', () => {
     it('should register a module successfully', async () => {
-      const result = await registry.register(testModule);
+        const result = await registry.register(testModule as unknown as IModule);
       
       expect(result.success).toBe(true);
       expect(registry.getModule('test-module' as ModuleID)).toBe(testModule);
@@ -139,8 +138,8 @@ describe('ModuleRegistry', () => {
     });
 
     it('should prevent duplicate module registration', async () => {
-      await registry.register(testModule);
-      const result = await registry.register(testModule);
+      await registry.register(testModule as unknown as IModule);
+      const result = await registry.register(testModule as unknown as IModule);
       
       expect(result.success).toBe(false);
       expect(result.error?.message).toContain('already registered');
@@ -148,7 +147,7 @@ describe('ModuleRegistry', () => {
 
     it('should validate dependencies during registration', async () => {
       // Try to register dependent module without its dependency
-      const result = await registry.register(dependentModule);
+      const result = await registry.register(dependentModule as unknown as IModule);
       
       expect(result.success).toBe(false);
       expect(result.error?.message).toContain('Required dependency test-module is not registered');
@@ -156,10 +155,10 @@ describe('ModuleRegistry', () => {
 
     it('should register modules with dependencies in correct order', async () => {
       // Register dependency first
-      await registry.register(testModule);
+      await registry.register(testModule as unknown as IModule);
       
       // Then register dependent module
-      const result = await registry.register(dependentModule);
+      const result = await registry.register(dependentModule as unknown as IModule);
       
       expect(result.success).toBe(true);
       expect(registry.getModule('dependent-module' as ModuleID)).toBe(dependentModule);
@@ -167,10 +166,10 @@ describe('ModuleRegistry', () => {
   });
 
   describe('module unregistration', () => {
-    beforeEach(async () => {
-      await registry.register(testModule);
-      await registry.register(dependentModule);
-    });
+      beforeEach(async () => {
+        await registry.register(testModule as unknown as IModule);
+        await registry.register(dependentModule as unknown as IModule);
+      });
 
     it('should unregister a module without dependents', async () => {
       const result = await registry.unregister('dependent-module' as ModuleID);
@@ -196,7 +195,7 @@ describe('ModuleRegistry', () => {
 
   describe('module loading', () => {
     beforeEach(async () => {
-      await registry.register(testModule);
+      await registry.register(testModule as unknown as IModule);
       
       // Mock configuration
       mockConfigService.get.mockImplementation((key: string) => {
@@ -267,8 +266,8 @@ describe('ModuleRegistry', () => {
       expect(result.error?.message).toContain('No configuration found');
     });
 
-    it('should load dependencies before loading module', async () => {
-      await registry.register(dependentModule);
+      it('should load dependencies before loading module', async () => {
+        await registry.register(dependentModule as unknown as IModule);
       
       mockConfigService.get.mockImplementation((key: string) => {
         const configs = {
@@ -344,9 +343,9 @@ describe('ModuleRegistry', () => {
   });
 
   describe('module unloading', () => {
-    beforeEach(async () => {
-      await registry.register(testModule);
-      await registry.register(dependentModule);
+      beforeEach(async () => {
+        await registry.register(testModule as unknown as IModule);
+        await registry.register(dependentModule as unknown as IModule);
       
       mockConfigService.get.mockImplementation((key: string) => {
         const configs = {
@@ -414,9 +413,9 @@ describe('ModuleRegistry', () => {
   });
 
   describe('module queries', () => {
-    beforeEach(async () => {
-      await registry.register(testModule);
-      await registry.register(dependentModule);
+      beforeEach(async () => {
+        await registry.register(testModule as unknown as IModule);
+        await registry.register(dependentModule as unknown as IModule);
     });
 
     it('should get module by ID', () => {
@@ -452,9 +451,9 @@ describe('ModuleRegistry', () => {
 
   describe('customer module loading', () => {
     it('should load customer modules based on configuration', async () => {
-      await registry.register(testModule);
+        await registry.register(testModule as unknown as IModule);
       
-      const customerConfig = global.ConfigTestUtils?.createMockConfig() || {
+        const customerConfig = (global as any).ConfigTestUtils?.createMockConfig() || {
         customer_id: 'test-customer' as CustomerID,
         name: 'Test Customer',
         version: '1.0.0',
@@ -571,9 +570,9 @@ describe('ModuleRegistry', () => {
   });
 
   describe('configuration change handling', () => {
-    beforeEach(async () => {
-      await registry.register(testModule);
-    });
+      beforeEach(async () => {
+        await registry.register(testModule as unknown as IModule);
+      });
 
     it('should handle module enable/disable changes', async () => {
       const mockWatch = mockConfigService.watch.mock.calls[0][1];
@@ -601,10 +600,10 @@ describe('ModuleRegistry', () => {
   });
 
   describe('cleanup and destruction', () => {
-    beforeEach(async () => {
-      await registry.register(testModule);
-      await registry.register(dependentModule);
-    });
+      beforeEach(async () => {
+        await registry.register(testModule as unknown as IModule);
+        await registry.register(dependentModule as unknown as IModule);
+      });
 
     it('should destroy registry and cleanup resources', async () => {
       await registry.destroy();
@@ -622,7 +621,7 @@ describe('ModuleEventBus', () => {
   let testModule: TestModule;
 
   beforeEach(() => {
-    mockLogger = global.TestUtils?.createMockLogger() || {
+    mockLogger = (global as any).TestUtils?.createMockLogger() || {
       debug: jest.fn(),
       info: jest.fn(),
       warn: jest.fn(),
@@ -661,8 +660,8 @@ describe('ModuleEventBus', () => {
     await registry.destroy();
   });
 
-  it('should handle event bus functionality through context', async () => {
-    await registry.register(testModule);
+    it('should handle event bus functionality through context', async () => {
+      await registry.register(testModule as unknown as IModule);
     
     mockConfigService.get = jest.fn().mockReturnValue({
       module_id: 'test-module' as ModuleID,

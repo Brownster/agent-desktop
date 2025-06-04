@@ -63,7 +63,7 @@ export class DynamoDBConfigStore implements IConfigStore {
     }
 
     const client = new DynamoDBClient({
-      region: process.env.AWS_REGION || 'us-east-1',
+      region: process.env['AWS_REGION'] || 'us-east-1',
       maxAttempts: 3,
     });
     this.ddbDocClient = DynamoDBDocumentClient.from(client, {
@@ -402,15 +402,17 @@ export class MemoryConfigStore implements IConfigStore {
     }
 
     const customerConfig = customerConfigResult.data;
-    const moduleIndex = customerConfig.modules.findIndex(m => m.module_id === config.module_id);
-    
+    const modules = [...customerConfig.modules];
+    const moduleIndex = modules.findIndex(m => m.module_id === config.module_id);
+
     if (moduleIndex >= 0) {
-      customerConfig.modules[moduleIndex] = config;
+      modules[moduleIndex] = config;
     } else {
-      customerConfig.modules.push(config);
+      modules.push(config);
     }
 
-    return this.saveCustomerConfig(customerConfig);
+    const updatedConfig: CustomerConfig = { ...customerConfig, modules };
+    return this.saveCustomerConfig(updatedConfig);
   }
 
   async deleteModuleConfig(customerId: string, moduleId: string): Promise<Result<void, Error>> {
@@ -420,8 +422,9 @@ export class MemoryConfigStore implements IConfigStore {
     }
 
     const customerConfig = customerConfigResult.data;
-    customerConfig.modules = customerConfig.modules.filter(m => m.module_id !== moduleId);
+    const modules = customerConfig.modules.filter(m => m.module_id !== moduleId);
+    const updatedConfig: CustomerConfig = { ...customerConfig, modules };
 
-    return this.saveCustomerConfig(customerConfig);
+    return this.saveCustomerConfig(updatedConfig);
   }
 }
