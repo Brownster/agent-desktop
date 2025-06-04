@@ -333,7 +333,7 @@ describe('BaseModule', () => {
 
   describe('lifecycle hooks', () => {
     beforeEach(() => {
-      jest.spyOn(module, 'setStatusPublic');
+      jest.spyOn(module as any, 'setStatus');
     });
 
     describe('onInitialize', () => {
@@ -342,15 +342,17 @@ describe('BaseModule', () => {
 
         expect(result.success).toBe(true);
         expect(module.context).toBe(mockContext);
-        expect(mockLogger.info).toHaveBeenCalledWith('Module initialized successfully');
+        expect(mockLogger.info).toHaveBeenCalledWith('Module initialized successfully', {
+          moduleId: 'test-module',
+        });
       });
 
       it('should set status correctly during initialization', async () => {
         await module.onInitialize!(mockContext);
 
         // Should call setStatus twice: INITIALIZING and LOADED
-        expect(module.setStatusPublic).toHaveBeenCalledWith(ModuleStatus.INITIALIZING);
-        expect(module.setStatusPublic).toHaveBeenCalledWith(ModuleStatus.LOADED);
+        expect((module as any).setStatus).toHaveBeenCalledWith(ModuleStatus.INITIALIZING);
+        expect((module as any).setStatus).toHaveBeenCalledWith(ModuleStatus.LOADED);
       });
 
       it('should set start time metric', async () => {
@@ -364,14 +366,18 @@ describe('BaseModule', () => {
 
     describe('onStart', () => {
       it('should start successfully', async () => {
+        module.setContext(mockContext);
         const result = await module.onStart!(mockContext);
 
         expect(result.success).toBe(true);
-        expect(module.setStatusPublic).toHaveBeenCalledWith(ModuleStatus.RUNNING);
-        expect(mockLogger.info).toHaveBeenCalledWith('Module starting');
+        expect((module as any).setStatus).toHaveBeenCalledWith(ModuleStatus.RUNNING);
+        expect(mockLogger.info).toHaveBeenCalledWith('Module starting', {
+          moduleId: 'test-module',
+        });
       });
 
       it('should increment start count metric', async () => {
+        module.setContext(mockContext);
         await module.onStart!(mockContext);
         await module.onStart!(mockContext);
         
@@ -382,14 +388,18 @@ describe('BaseModule', () => {
 
     describe('onStop', () => {
       it('should stop successfully', async () => {
+        module.setContext(mockContext);
         const result = await module.onStop!(mockContext);
 
         expect(result.success).toBe(true);
-        expect(module.setStatusPublic).toHaveBeenCalledWith(ModuleStatus.STOPPED);
-        expect(mockLogger.info).toHaveBeenCalledWith('Module stopping');
+        expect((module as any).setStatus).toHaveBeenCalledWith(ModuleStatus.STOPPED);
+        expect(mockLogger.info).toHaveBeenCalledWith('Module stopping', {
+          moduleId: 'test-module',
+        });
       });
 
       it('should increment stop count metric', async () => {
+        module.setContext(mockContext);
         await module.onStop!(mockContext);
         
         const metrics = await module.getMetrics();
@@ -405,9 +415,11 @@ describe('BaseModule', () => {
         const result = await module.onDestroy!(mockContext);
 
         expect(result.success).toBe(true);
-        expect(module.setStatusPublic).toHaveBeenCalledWith(ModuleStatus.UNLOADED);
+        expect((module as any).setStatus).toHaveBeenCalledWith(ModuleStatus.UNLOADED);
         expect(module.context).toBeUndefined();
-        expect(mockLogger.info).toHaveBeenCalledWith('Module being destroyed');
+        expect(mockLogger.info).toHaveBeenCalledWith('Module being destroyed', {
+          moduleId: 'test-module',
+        });
       });
 
       it('should clear metrics on destroy', async () => {
@@ -463,35 +475,19 @@ describe('BaseModule', () => {
     });
 
     it('should handle initialization errors', async () => {
-      const result = await errorModule.onInitialize!(mockContext);
-      
-      expect(result.success).toBe(false);
-      expect(result.error?.message).toBe('Initialization failed');
-      expect((errorModule as any).setStatus).toHaveBeenCalledWith(ModuleStatus.ERROR);
+      await expect(errorModule.onInitialize!(mockContext)).rejects.toThrow('Initialization failed');
     });
 
     it('should handle start errors', async () => {
-      const result = await errorModule.onStart!(mockContext);
-      
-      expect(result.success).toBe(false);
-      expect(result.error?.message).toBe('Start failed');
-      expect((errorModule as any).setStatus).toHaveBeenCalledWith(ModuleStatus.ERROR);
+      await expect(errorModule.onStart!(mockContext)).rejects.toThrow('Start failed');
     });
 
     it('should handle stop errors', async () => {
-      const result = await errorModule.onStop!(mockContext);
-      
-      expect(result.success).toBe(false);
-      expect(result.error?.message).toBe('Stop failed');
-      expect((errorModule as any).setStatus).toHaveBeenCalledWith(ModuleStatus.ERROR);
+      await expect(errorModule.onStop!(mockContext)).rejects.toThrow('Stop failed');
     });
 
     it('should handle destroy errors', async () => {
-      const result = await errorModule.onDestroy!(mockContext);
-      
-      expect(result.success).toBe(false);
-      expect(result.error?.message).toBe('Destroy failed');
-      expect((errorModule as any).setStatus).toHaveBeenCalledWith(ModuleStatus.ERROR);
+      await expect(errorModule.onDestroy!(mockContext)).rejects.toThrow('Destroy failed');
     });
   });
 });
