@@ -7,6 +7,7 @@ import {
   PencilIcon,
   TrashIcon,
   CloudArrowUpIcon,
+  UserGroupIcon,
 } from '@heroicons/react/24/outline';
 
 /**

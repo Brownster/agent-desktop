@@ -6,6 +6,7 @@ import {
   DocumentTextIcon,
   CodeBracketIcon,
   Cog6ToothIcon,
+  CubeIcon,
 } from '@heroicons/react/24/outline';
 
 /**
