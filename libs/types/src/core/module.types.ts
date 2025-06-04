@@ -4,7 +4,6 @@
  */
 
 import type { ComponentType } from 'react';
-import type { LoggerConfig } from './logging.types';
 import type { HealthStatus } from './health.types';
 import type { EventBus } from './event.types';
 import type { ModuleConfig } from './config.types';

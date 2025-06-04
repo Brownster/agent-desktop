@@ -1,11 +1,11 @@
 /* eslint-disable */
 module.exports = {
-  displayName: 'ccp-admin',
+  displayName: 'ccp-client',
   preset: '../../jest.preset.js',
   transform: {
     '^.+\\.[tj]sx?$': ['babel-jest', { presets: ['@nx/react/babel'] }],
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
-  coverageDirectory: '../../coverage/apps/ccp-admin',
+  coverageDirectory: '../../coverage/apps/ccp-client',
   passWithNoTests: true,
 };

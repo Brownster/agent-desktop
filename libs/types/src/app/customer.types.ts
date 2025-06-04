@@ -4,7 +4,6 @@
  */
 
 import type { ModuleConfig, Environment } from '../core/config.types';
-import type { ModuleType } from '../core/module.types';
 
 /**
  * Customer configuration schema

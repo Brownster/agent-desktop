@@ -2,10 +2,10 @@
  * @fileoverview Tests for the LoggerFactory class
  */
 
-import { LogLevel } from '@agent-desktop/types';
+// Import LogLevel from types library
+const { LogLevel } = require('@agent-desktop/types');
 import { LoggerFactory, createLogger, getLogger } from './logger-factory';
 import { Logger } from './logger';
-import { ConsoleTransport } from './transports';
 
 describe('LoggerFactory', () => {
   let factory: LoggerFactory;

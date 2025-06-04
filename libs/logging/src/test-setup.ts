@@ -47,6 +47,22 @@ global.LoggingTestUtils = {
   mockMemoryUsage,
   
   /**
+   * Create a mock logger for testing
+   */
+  createMockLogger: (name = 'test-logger') => ({
+    name,
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    createChild: jest.fn().mockReturnThis(),
+    addTransport: jest.fn(),
+    removeTransport: jest.fn(),
+    flush: jest.fn().mockResolvedValue(undefined),
+    close: jest.fn().mockResolvedValue(undefined),
+  }),
+  
+  /**
    * Create a mock transport for testing
    */
   createMockTransport: (name = 'mock-transport') => ({
@@ -58,6 +74,27 @@ global.LoggingTestUtils = {
   }),
   
   /**
+   * Capture log output for testing
+   */
+  captureLogOutput: () => {
+    const logs: any[] = [];
+    const originalConsole = { ...console };
+    
+    ['log', 'info', 'warn', 'error', 'debug'].forEach(method => {
+      (console as any)[method] = jest.fn((...args: any[]) => {
+        logs.push({ level: method, args });
+      });
+    });
+    
+    return {
+      logs,
+      stop: () => {
+        Object.assign(console, originalConsole);
+      },
+    };
+  },
+  
+  /**
    * Wait for async operations to complete
    */
   waitFor: (ms = 0) => new Promise(resolve => setTimeout(resolve, ms)),
@@ -66,4 +103,29 @@ global.LoggingTestUtils = {
    * Flush all pending promises
    */
   flushPromises: () => new Promise(resolve => setImmediate(resolve)),
+  
+  /**
+   * Mock console transport
+   */
+  mockConsoleTransport: {
+    log: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    info: jest.fn(),
+    debug: jest.fn(),
+    reset: () => {
+      jest.clearAllMocks();
+    },
+  },
+  
+  /**
+   * Mock file transport
+   */
+  mockFileTransport: {
+    write: jest.fn(),
+    rotate: jest.fn(),
+    reset: () => {
+      jest.clearAllMocks();
+    },
+  },
 };

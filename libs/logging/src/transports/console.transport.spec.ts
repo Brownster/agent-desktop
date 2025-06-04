@@ -2,7 +2,8 @@
  * @fileoverview Tests for the ConsoleTransport class
  */
 
-import { LogLevel } from '@agent-desktop/types';
+// Import LogLevel from types library
+const { LogLevel } = require('@agent-desktop/types');
 import { ConsoleTransport } from './console.transport';
 
 describe('ConsoleTransport', () => {

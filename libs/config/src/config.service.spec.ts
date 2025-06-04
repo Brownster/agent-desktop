@@ -3,14 +3,13 @@
  */
 
 import { ConfigService, ConfigSource } from './config.service';
-import { createLogger } from '@agent-desktop/logging';
 
 describe('ConfigService', () => {
   let configService: ConfigService;
   let mockLogger: any;
 
   beforeEach(() => {
-    mockLogger = global.TestUtils?.createMockLogger() || {
+    mockLogger = (global as any).TestUtils?.createMockLogger() || {
       debug: jest.fn(),
       info: jest.fn(),
       warn: jest.fn(),
@@ -348,8 +347,8 @@ describe('ConfigService', () => {
     });
 
     it('should use environment variables when available', () => {
-      const originalEnv = process.env.API_ENDPOINT;
-      process.env.API_ENDPOINT = 'https://test-api.example.com';
+      const originalEnv = process.env['API_ENDPOINT'];
+      process.env['API_ENDPOINT'] = 'https://test-api.example.com';
 
       const envConfig = configService.getEnvironmentConfig();
       
@@ -357,24 +356,24 @@ describe('ConfigService', () => {
 
       // Restore original environment
       if (originalEnv !== undefined) {
-        process.env.API_ENDPOINT = originalEnv;
+        process.env['API_ENDPOINT'] = originalEnv;
       } else {
-        delete process.env.API_ENDPOINT;
+        delete process.env['API_ENDPOINT'];
       }
     });
 
     it('should set appropriate defaults for different environments', () => {
-      const originalEnv = process.env.NODE_ENV;
+      const originalEnv = process.env['NODE_ENV'];
 
       // Test production environment
-      process.env.NODE_ENV = 'production';
+      process.env['NODE_ENV'] = 'production';
       const prodConfig = configService.getEnvironmentConfig();
       expect(prodConfig.environment).toBe('production');
       expect(prodConfig.enableTelemetry).toBe(true);
       expect(prodConfig.debugMode).toBe(false);
 
       // Test development environment
-      process.env.NODE_ENV = 'development';
+      process.env['NODE_ENV'] = 'development';
       const devConfig = configService.getEnvironmentConfig();
       expect(devConfig.environment).toBe('development');
       expect(devConfig.enableTelemetry).toBe(false);
@@ -382,9 +381,9 @@ describe('ConfigService', () => {
 
       // Restore original environment
       if (originalEnv !== undefined) {
-        process.env.NODE_ENV = originalEnv;
+        process.env['NODE_ENV'] = originalEnv;
       } else {
-        delete process.env.NODE_ENV;
+        delete process.env['NODE_ENV'];
       }
     });
   });

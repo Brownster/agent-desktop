@@ -3,7 +3,7 @@ const nxPreset = require('@nx/jest/preset').default;
 module.exports = {
   ...nxPreset,
   testEnvironment: 'jsdom',
-  moduleNameMapping: {
+  moduleNameMapper: {
     '^@agent-desktop/(.*)$': '<rootDir>/libs/$1/src',
   },
   collectCoverageFrom: [

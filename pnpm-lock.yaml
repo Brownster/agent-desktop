@@ -467,6 +467,9 @@ importers:
       '@types/jest':
         specifier: ^29.5.5
         version: 29.5.14
+      '@types/react':
+        specifier: ^18.2.15
+        version: 18.3.23
       '@typescript-eslint/eslint-plugin':
         specifier: ^6.0.0
         version: 6.21.0(@typescript-eslint/parser@6.21.0)(eslint@8.57.1)(typescript@5.8.3)

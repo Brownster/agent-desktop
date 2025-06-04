@@ -2,7 +2,8 @@
  * @fileoverview Tests for the Logger class
  */
 
-import { LogLevel } from '@agent-desktop/types';
+// Import LogLevel from types library
+const { LogLevel } = require('@agent-desktop/types');
 import { Logger } from './logger';
 
 describe('Logger', () => {
@@ -294,7 +295,7 @@ describe('Logger', () => {
 
       await logger.flush();
 
-      const errorCall = mockTransport.write.mock.calls.find(call => 
+      const errorCall = mockTransport.write.mock.calls.find((call: any) => 
         call[0].level === LogLevel.ERROR
       );
 

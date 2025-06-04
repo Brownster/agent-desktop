@@ -177,4 +177,68 @@ global.ConfigTestUtils = {
    * Flush all pending promises
    */
   flushPromises: () => new Promise(resolve => setImmediate(resolve)),
+
+  /**
+   * Create a mock customer configuration
+   */
+  createMockCustomerConfig: (overrides = {}) => ({
+    customer_id: 'test-customer',
+    name: 'Test Customer',
+    ...overrides,
+  }),
+
+  /**
+   * Create a mock module configuration
+   */
+  createMockModuleConfig: (overrides = {}) => ({
+    module_id: 'test-module',
+    enabled: true,
+    position: 'sidebar',
+    priority: 1,
+    ...overrides,
+  }),
+
+  /**
+   * Create a mock branding configuration
+   */
+  createMockBrandingConfig: (overrides = {}) => ({
+    primary_color: '#1e40af',
+    secondary_color: '#374151',
+    font_family: 'Inter, sans-serif',
+    theme: 'light',
+    application_title: 'Test App',
+    company_name: 'Test Company',
+    ...overrides,
+  }),
+
+  /**
+   * Create mock feature flags
+   */
+  createMockFeatureFlags: (overrides = {}) => ({
+    recording_controls: true,
+    screen_sharing: false,
+    file_uploads: true,
+    chat_functionality: true,
+    supervisor_monitoring: false,
+    analytics_dashboard: true,
+    custom_scripts: false,
+    third_party_integrations: true,
+    advanced_routing: false,
+    real_time_reporting: true,
+    voice_analytics: false,
+    sentiment_analysis: false,
+    ...overrides,
+  }),
+
+  /**
+   * Mock configuration service
+   */
+  mockConfigService: {
+    getCustomerConfig: jest.fn(),
+    updateCustomerConfig: jest.fn(),
+    validateConfig: jest.fn(),
+    reset: () => {
+      jest.clearAllMocks();
+    },
+  },
 };

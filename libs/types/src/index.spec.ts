@@ -2,27 +2,20 @@
  * @fileoverview Basic type tests to ensure type exports work correctly
  */
 
+import { LogLevel } from './core/logging.types';
+import { ModuleType } from './core/module.types';
+import { HealthStatusLevel } from './core/health.types';
+import { EventCategory } from './core/event.types';
+import { AgentState } from './connect/agent.types';
+import { ContactState, ContactType } from './connect/contact.types';
+import { IntegrationType } from './app/customer.types';
+
 import type {
-  // Core types
-  LogLevel,
-  ModuleType,
-  HealthStatusLevel,
-  EventCategory,
-  
-  // Amazon Connect types
-  AgentState,
-  ContactState,
-  ContactType,
-  QueueStatus,
-  
-  // Application types
+  // Application types (interfaces)
   CustomerConfig,
   BrandingConfig,
-  IntegrationType,
-  DeploymentEnvironment,
   
-  // Utility types
-  Result,
+  // Utility types (branded types)
   UUID,
   Email,
   PhoneNumber,
