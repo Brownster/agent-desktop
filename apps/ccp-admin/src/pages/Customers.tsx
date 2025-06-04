@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   PlusIcon,
@@ -9,76 +9,16 @@ import {
   CloudArrowUpIcon,
   UserGroupIcon,
 } from '@heroicons/react/24/outline';
-
-/**
- * Customer interface
- */
-interface Customer {
-  id: string;
-  name: string;
-  companyName: string;
-  status: 'active' | 'inactive' | 'pending';
-  environment: 'development' | 'staging' | 'production';
-  moduleCount: number;
-  lastDeployment: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-/**
- * Mock customer data
- */
-const customers: Customer[] = [
-  {
-    id: 'cust-001',
-    name: 'Acme Corporation',
-    companyName: 'Acme Corp',
-    status: 'active',
-    environment: 'production',
-    moduleCount: 8,
-    lastDeployment: '2024-01-15',
-    createdAt: '2024-01-10',
-    updatedAt: '2024-01-15',
-  },
-  {
-    id: 'cust-002',
-    name: 'TechStart Solutions',
-    companyName: 'TechStart Inc',
-    status: 'active',
-    environment: 'staging',
-    moduleCount: 5,
-    lastDeployment: '2024-01-14',
-    createdAt: '2024-01-12',
-    updatedAt: '2024-01-14',
-  },
-  {
-    id: 'cust-003',
-    name: 'Global Enterprises',
-    companyName: 'Global Corp',
-    status: 'pending',
-    environment: 'development',
-    moduleCount: 3,
-    lastDeployment: 'Never',
-    createdAt: '2024-01-16',
-    updatedAt: '2024-01-16',
-  },
-  {
-    id: 'cust-004',
-    name: 'Innovation Labs',
-    companyName: 'InnoLab',
-    status: 'inactive',
-    environment: 'production',
-    moduleCount: 6,
-    lastDeployment: '2023-12-20',
-    createdAt: '2023-11-15',
-    updatedAt: '2023-12-20',
-  },
-];
+import { useCustomers } from '@/services';
 
 /**
  * Status badge component
  */
-function StatusBadge({ status }: { status: Customer['status'] }): React.ReactElement {
+function StatusBadge({
+  status,
+}: {
+  status: 'active' | 'inactive' | 'pending';
+}): React.ReactElement {
   const styles = {
     active: 'badge-success',
     inactive: 'badge-gray',
@@ -95,7 +35,11 @@ function StatusBadge({ status }: { status: Customer['status'] }): React.ReactEle
 /**
  * Environment badge component
  */
-function EnvironmentBadge({ environment }: { environment: Customer['environment'] }): React.ReactElement {
+function EnvironmentBadge({
+  environment,
+}: {
+  environment: 'development' | 'staging' | 'production';
+}): React.ReactElement {
   const styles = {
     development: 'badge-warning',
     staging: 'badge-primary',
@@ -114,149 +58,161 @@ function EnvironmentBadge({ environment }: { environment: Customer['environment'
  */
 function Customers(): React.ReactElement {
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<Customer['status'] | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'pending' | 'all'>(
+    'all'
+  );
+
+  const { data } = useCustomers();
+  const customers = data?.items ?? [];
+  const summary = data?.summary;
 
   // Filter customers based on search and status
-  const filteredCustomers = customers.filter((customer) => {
-    const matchesSearch = customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         customer.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         customer.id.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || customer.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
-  });
+  const filteredCustomers = useMemo(
+    () =>
+      customers.filter(customer => {
+        const matchesSearch =
+          customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          customer.branding.company_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          customer.customer_id.toLowerCase().includes(searchTerm.toLowerCase());
+
+        const status = customer.isActive ? 'active' : 'inactive';
+        const matchesStatus = statusFilter === 'all' || status === statusFilter;
+
+        return matchesSearch && matchesStatus;
+      }),
+    [customers, searchTerm, statusFilter]
+  );
 
   return (
-    <div className="space-y-6">
+    <div className='space-y-6'>
       {/* Page header */}
-      <div className="flex justify-between items-center">
+      <div className='flex justify-between items-center'>
         <div>
-          <h2 className="text-3xl font-bold text-gray-900">Customer Management</h2>
-          <p className="mt-2 text-gray-600">
-            Manage customer configurations and deployments
-          </p>
+          <h2 className='text-3xl font-bold text-gray-900'>Customer Management</h2>
+          <p className='mt-2 text-gray-600'>Manage customer configurations and deployments</p>
         </div>
-        <button className="btn-primary">
-          <PlusIcon className="h-5 w-5 mr-2" />
+        <button className='btn-primary'>
+          <PlusIcon className='h-5 w-5 mr-2' />
           Add Customer
         </button>
       </div>
 
       {/* Filters and search */}
-      <div className="card p-6">
-        <div className="flex flex-col sm:flex-row gap-4">
+      <div className='card p-6'>
+        <div className='flex flex-col sm:flex-row gap-4'>
           {/* Search */}
-          <div className="flex-1">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+          <div className='flex-1'>
+            <div className='relative'>
+              <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
+                <MagnifyingGlassIcon className='h-5 w-5 text-gray-400' />
               </div>
               <input
-                type="text"
-                className="input pl-10"
-                placeholder="Search customers..."
+                type='text'
+                className='input pl-10'
+                placeholder='Search customers...'
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={e => setSearchTerm(e.target.value)}
               />
             </div>
           </div>
 
           {/* Status filter */}
-          <div className="sm:w-48">
+          <div className='sm:w-48'>
             <select
-              className="input"
+              className='input'
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as Customer['status'] | 'all')}
+              onChange={e =>
+                setStatusFilter(e.target.value as 'active' | 'inactive' | 'pending' | 'all')
+              }
             >
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="pending">Pending</option>
+              <option value='all'>All Status</option>
+              <option value='active'>Active</option>
+              <option value='inactive'>Inactive</option>
+              <option value='pending'>Pending</option>
             </select>
           </div>
         </div>
       </div>
 
       {/* Results summary */}
-      <div className="flex justify-between items-center text-sm text-gray-600">
+      <div className='flex justify-between items-center text-sm text-gray-600'>
         <span>
           Showing {filteredCustomers.length} of {customers.length} customers
         </span>
         <span>
-          Total: {customers.filter(c => c.status === 'active').length} active, {' '}
-          {customers.filter(c => c.status === 'inactive').length} inactive, {' '}
-          {customers.filter(c => c.status === 'pending').length} pending
+          Total: {summary?.totalActive ?? 0} active, {summary?.totalInactive ?? 0} inactive
         </span>
       </div>
 
       {/* Customer table */}
-      <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="table">
-            <thead className="table-header">
+      <div className='card overflow-hidden'>
+        <div className='overflow-x-auto'>
+          <table className='table'>
+            <thead className='table-header'>
               <tr>
-                <th className="table-header-cell">Customer</th>
-                <th className="table-header-cell">Status</th>
-                <th className="table-header-cell">Environment</th>
-                <th className="table-header-cell">Modules</th>
-                <th className="table-header-cell">Last Deployment</th>
-                <th className="table-header-cell">Updated</th>
-                <th className="table-header-cell">Actions</th>
+                <th className='table-header-cell'>Customer</th>
+                <th className='table-header-cell'>Status</th>
+                <th className='table-header-cell'>Environment</th>
+                <th className='table-header-cell'>Modules</th>
+                <th className='table-header-cell'>Last Deployment</th>
+                <th className='table-header-cell'>Updated</th>
+                <th className='table-header-cell'>Actions</th>
               </tr>
             </thead>
-            <tbody className="table-body">
-              {filteredCustomers.map((customer) => (
-                <tr key={customer.id} className="table-body-row">
-                  <td className="table-body-cell">
+            <tbody className='table-body'>
+              {filteredCustomers.map(customer => (
+                <tr key={customer.customer_id} className='table-body-row'>
+                  <td className='table-body-cell'>
                     <div>
-                      <div className="font-medium text-gray-900">{customer.name}</div>
-                      <div className="text-gray-500">{customer.companyName}</div>
-                      <div className="text-xs text-gray-400">{customer.id}</div>
+                      <div className='font-medium text-gray-900'>{customer.name}</div>
+                      <div className='text-gray-500'>{customer.branding.company_name}</div>
+                      <div className='text-xs text-gray-400'>{customer.customer_id}</div>
                     </div>
                   </td>
-                  <td className="table-body-cell">
-                    <StatusBadge status={customer.status} />
+                  <td className='table-body-cell'>
+                    <StatusBadge status={customer.isActive ? 'active' : 'inactive'} />
                   </td>
-                  <td className="table-body-cell">
-                    <EnvironmentBadge environment={customer.environment} />
+                  <td className='table-body-cell'>
+                    <EnvironmentBadge environment={customer.deployment.environment} />
                   </td>
-                  <td className="table-body-cell">
-                    <span className="text-gray-900 font-medium">{customer.moduleCount}</span>
-                    <span className="text-gray-500 text-sm ml-1">modules</span>
+                  <td className='table-body-cell'>
+                    <span className='text-gray-900 font-medium'>{customer.modules.length}</span>
+                    <span className='text-gray-500 text-sm ml-1'>modules</span>
                   </td>
-                  <td className="table-body-cell">
-                    <div className="text-gray-900">{customer.lastDeployment}</div>
+                  <td className='table-body-cell'>
+                    <div className='text-gray-900'>N/A</div>
                   </td>
-                  <td className="table-body-cell">
-                    <div className="text-gray-900">{customer.updatedAt}</div>
+                  <td className='table-body-cell'>
+                    <div className='text-gray-900'>
+                      {new Date(customer.updatedAt).toLocaleDateString()}
+                    </div>
                   </td>
-                  <td className="table-body-cell">
-                    <div className="flex items-center space-x-2">
+                  <td className='table-body-cell'>
+                    <div className='flex items-center space-x-2'>
                       <Link
-                        to={`/customers/${customer.id}`}
-                        className="p-1 text-gray-400 hover:text-connect-600 hover:bg-connect-50 rounded"
-                        title="View details"
+                        to={`/customers/${customer.customer_id}`}
+                        className='p-1 text-gray-400 hover:text-connect-600 hover:bg-connect-50 rounded'
+                        title='View details'
                       >
-                        <EyeIcon className="h-4 w-4" />
+                        <EyeIcon className='h-4 w-4' />
                       </Link>
                       <button
-                        className="p-1 text-gray-400 hover:text-warning-600 hover:bg-warning-50 rounded"
-                        title="Edit configuration"
+                        className='p-1 text-gray-400 hover:text-warning-600 hover:bg-warning-50 rounded'
+                        title='Edit configuration'
                       >
-                        <PencilIcon className="h-4 w-4" />
+                        <PencilIcon className='h-4 w-4' />
                       </button>
                       <button
-                        className="p-1 text-gray-400 hover:text-connect-600 hover:bg-connect-50 rounded"
-                        title="Deploy configuration"
+                        className='p-1 text-gray-400 hover:text-connect-600 hover:bg-connect-50 rounded'
+                        title='Deploy configuration'
                       >
-                        <CloudArrowUpIcon className="h-4 w-4" />
+                        <CloudArrowUpIcon className='h-4 w-4' />
                       </button>
                       <button
-                        className="p-1 text-gray-400 hover:text-error-600 hover:bg-error-50 rounded"
-                        title="Delete customer"
+                        className='p-1 text-gray-400 hover:text-error-600 hover:bg-error-50 rounded'
+                        title='Delete customer'
                       >
-                        <TrashIcon className="h-4 w-4" />
+                        <TrashIcon className='h-4 w-4' />
                       </button>
                     </div>
                   </td>
@@ -268,19 +224,18 @@ function Customers(): React.ReactElement {
 
         {/* Empty state */}
         {filteredCustomers.length === 0 && (
-          <div className="text-center py-12">
-            <UserGroupIcon className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No customers found</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              {searchTerm || statusFilter !== 'all' 
+          <div className='text-center py-12'>
+            <UserGroupIcon className='mx-auto h-12 w-12 text-gray-400' />
+            <h3 className='mt-2 text-sm font-medium text-gray-900'>No customers found</h3>
+            <p className='mt-1 text-sm text-gray-500'>
+              {searchTerm || statusFilter !== 'all'
                 ? 'Try adjusting your search or filter criteria.'
-                : 'Get started by creating your first customer configuration.'
-              }
+                : 'Get started by creating your first customer configuration.'}
             </p>
             {!searchTerm && statusFilter === 'all' && (
-              <div className="mt-6">
-                <button className="btn-primary">
-                  <PlusIcon className="h-5 w-5 mr-2" />
+              <div className='mt-6'>
+                <button className='btn-primary'>
+                  <PlusIcon className='h-5 w-5 mr-2' />
                   Add Customer
                 </button>
               </div>
