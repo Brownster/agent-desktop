@@ -6,6 +6,7 @@ import Dashboard from '@/pages/Dashboard';
 import Customers from '@/pages/Customers';
 import CustomerDetail from '@/pages/CustomerDetail';
 import Modules from '@/pages/Modules';
+import Branding from '@/pages/Branding';
 import Settings from '@/pages/Settings';
 import NotFound from '@/pages/NotFound';
 
@@ -32,6 +33,9 @@ function App(): React.ReactElement {
           
           {/* Module management */}
           <Route path="modules" element={<Modules />} />
+          
+          {/* Branding management */}
+          <Route path="branding" element={<Branding />} />
           
           {/* Settings */}
           <Route path="settings" element={<Settings />} />

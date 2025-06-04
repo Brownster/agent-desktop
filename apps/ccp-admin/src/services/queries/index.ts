@@ -71,3 +71,23 @@ export {
   useRealtimeAnalytics,
   useAnalyticsPreferences,
 } from './analytics.queries';
+
+// Branding queries
+export {
+  useBrandingConfig,
+  useUpdateBrandingConfig,
+  useValidateBrandingConfig,
+  useThemePresets,
+  useCreateThemePreset,
+  useUpdateThemePreset,
+  useDeleteThemePreset,
+  useUploadAsset,
+  useDeleteAsset,
+  useGenerateCSS,
+  usePreviewBranding,
+  useExportBrandingConfig,
+  useImportBrandingConfig,
+  useBrandingAnalytics,
+  useBrandingHistory,
+  useRestoreBrandingConfig,
+} from './branding.queries';

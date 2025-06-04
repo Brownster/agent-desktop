@@ -6,6 +6,7 @@ import {
   CubeIcon,
   Cog6ToothIcon,
   ChartBarIcon,
+  SwatchIcon,
 } from '@heroicons/react/24/outline';
 
 /**
@@ -39,6 +40,12 @@ const navigation: NavItem[] = [
     href: '/modules',
     icon: CubeIcon,
     description: 'Available modules and components',
+  },
+  {
+    name: 'Branding',
+    href: '/branding',
+    icon: SwatchIcon,
+    description: 'Custom themes and styling',
   },
   {
     name: 'Analytics',
