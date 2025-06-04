@@ -805,10 +805,30 @@ export class ModuleRegistry implements IModuleRegistry {
       // Handle other configuration changes
       if (module.context && module.onConfigChange) {
         const newConfig = this.getModuleConfig(moduleId);
-        const oldConfig = { ...newConfig, [keyParts[2]]: event.oldValue } as ModuleConfig;
-        
-        if (newConfig) {
-          await module.onConfigChange(newConfig, oldConfig, module.context);
+
+        if (!newConfig) {
+          this.options.logger.warn('Configuration missing for module', {
+            moduleId,
+          });
+          return;
+        }
+
+        const oldConfig = {
+          ...newConfig,
+          [keyParts[2]]: event.oldValue,
+        } as ModuleConfig;
+
+        const result = await module.onConfigChange(
+          newConfig,
+          oldConfig,
+          module.context,
+        );
+
+        if (!result.success) {
+          this.options.logger.warn('Module config change handler failed', {
+            moduleId,
+            error: result.error?.message,
+          });
         }
       }
     } catch (error) {
