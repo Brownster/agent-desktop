@@ -46,6 +46,13 @@ export * from './app/integration.types';
 export * from './app/branding.types';
 
 // Utility types
+export {
+  success,
+  failure,
+  isSuccess,
+  isFailure,
+} from './utils/common.types';
+
 export type {
   Result,
   Success,
@@ -53,10 +60,6 @@ export type {
   AsyncResult,
   Fallible,
   AsyncFallible,
-  isSuccess,
-  isFailure,
-  success,
-  failure,
 } from './utils/common.types';
 
 // Re-export branded utility types
