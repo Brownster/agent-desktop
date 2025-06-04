@@ -8,11 +8,13 @@ import { useAgentStore } from '../store/agent.store';
 import { useContactStore } from '../store/contact.store';
 import { useQueueStore } from '../store/queue.store';
 import type { Logger } from '@agent-desktop/logging';
+import { SoftphoneRTCSession } from 'amazon-connect-rtc-js';
 
 // Mock the stores
 jest.mock('../store/agent.store');
 jest.mock('../store/contact.store');
 jest.mock('../store/queue.store');
+jest.mock('amazon-connect-rtc-js');
 
 // Mock logger
 const mockLogger = {
@@ -217,6 +219,57 @@ describe('ConnectService', () => {
         'Initializing Amazon Connect CCP',
         { config: mockConfig }
       );
+    });
+
+    it('should disable framed softphone when audio mode is vdi', async () => {
+      await connectService.initializeCCP(mockContainer, mockConfig, { mode: 'vdi' });
+
+      expect(mockConnect.core.initCCP).toHaveBeenCalledWith(
+        mockContainer,
+        expect.objectContaining({
+          softphone: expect.objectContaining({ allowFramedSoftphone: false }),
+        })
+      );
+    });
+
+    it('should setup VDI audio when mode is vdi', async () => {
+      let agentCallback: (agent: any) => void;
+      mockConnect.agent.mockImplementation((cb) => {
+        agentCallback = cb;
+      });
+
+      const setupSpy = jest.spyOn<any, any>(connectService as any, 'setupVDIAudio');
+
+      await connectService.initializeCCP(mockContainer, mockConfig, { mode: 'vdi' });
+
+      agentCallback!(mockConnectAgent);
+
+      expect(setupSpy).toHaveBeenCalled();
+    });
+
+    it('should initialize SoftphoneRTCSession on agent refresh in VDI mode', async () => {
+      let firstAgentCallback: (agent: any) => void;
+      let refreshCallback: () => void;
+
+      // First call for initializeCCP
+      mockConnect.agent.mockImplementationOnce((cb) => {
+        firstAgentCallback = cb;
+      });
+      // Second call inside setupVDIAudio
+      mockConnect.agent.mockImplementationOnce((cb) => {
+        cb(mockConnectAgent);
+      });
+
+      mockConnectAgent.onRefresh.mockImplementation((cb) => {
+        refreshCallback = cb;
+      });
+
+      await connectService.initializeCCP(mockContainer, mockConfig, { mode: 'vdi' });
+
+      firstAgentCallback!(mockConnectAgent);
+      refreshCallback!();
+
+      expect(SoftphoneRTCSession).toHaveBeenCalledWith(mockConnect);
     });
 
     it.skip('should handle initialization errors', async () => {

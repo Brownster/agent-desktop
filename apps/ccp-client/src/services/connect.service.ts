@@ -7,6 +7,8 @@ import { useAgentStore, type AgentInfo, type AgentState, type UnavailableReason 
 import { useContactStore, type Contact, type ContactConnection, type ContactType, type ContactState } from '@/store/contact.store';
 import { useQueueStore } from '@/store/queue.store';
 import type { Logger } from '@agent-desktop/logging';
+import * as connectRTC from 'amazon-connect-rtc-js';
+import type { AudioConfiguration } from '@agent-desktop/types';
 
 /**
  * View contact event interface
@@ -288,6 +290,8 @@ export class ConnectService {
   private ccpContainer: HTMLElement | null = null;
   private agent: ConnectAgent | null = null;
   private activeContacts = new Map<string, ConnectContact>();
+  private audioConfig: AudioConfiguration | undefined;
+  private rtcSession: connectRTC.SoftphoneRTCSession | null = null;
 
   constructor(logger: Logger) {
     this.logger = logger.createChild('ConnectService');
@@ -296,14 +300,31 @@ export class ConnectService {
   /**
    * Initialize the Amazon Connect CCP
    */
-  async initializeCCP(container: HTMLElement, config: CCPInitConfig): Promise<void> {
-    this.logger.info('Initializing Amazon Connect CCP', { config });
+  async initializeCCP(
+    container: HTMLElement,
+    config: CCPInitConfig,
+    customerAudioConfig?: AudioConfiguration
+  ): Promise<void> {
+    this.logger.info('Initializing Amazon Connect CCP', {
+      config,
+      customerAudioConfig,
+    });
+    this.audioConfig = customerAudioConfig;
     
     try {
       this.ccpContainer = container;
       
+      const streamsConfig: CCPInitConfig = {
+        ...config,
+        softphone: {
+          ...config.softphone,
+          allowFramedSoftphone:
+            this.audioConfig?.mode !== 'vdi',
+        },
+      };
+
       // Initialize CCP
-      window.connect.core.initCCP(container, config);
+      window.connect.core.initCCP(container, streamsConfig);
       
       // Set up initialization callback
       window.connect.core.onInitialized(() => {
@@ -317,6 +338,13 @@ export class ConnectService {
       window.connect.agent((agent: ConnectAgent) => {
         this.agent = agent;
         this.setupAgentEventListeners(agent);
+        if (this.audioConfig?.mode === 'vdi') {
+          this.setupVDIAudio();
+        } else {
+          this.logger.info(
+            `Audio mode set to "${this.audioConfig?.mode || 'local'}". Using default Streams softphone.`
+          );
+        }
       });
 
       // Set up contact event listener
@@ -832,6 +860,34 @@ export class ConnectService {
       default:
         return { name: 'Offline', type: 'offline' };
     }
+  }
+
+  private setupVDIAudio(): void {
+    this.logger.info('Setting up VDI audio mode using amazon-connect-rtc-js.');
+
+    if (this.rtcSession) return;
+
+    connect.agent((agent: ConnectAgent) => {
+      agent.onRefresh(async () => {
+        try {
+          if (this.audioConfig?.mode === 'vdi' && !this.rtcSession) {
+            this.logger.info('Agent refreshed, initializing RTC session for VDI.');
+            this.rtcSession = new connectRTC.SoftphoneRTCSession(connect);
+            this.rtcSession.on('error', (error: unknown) => {
+              this.logger.error('RTC Session Error', { error });
+            });
+            this.rtcSession.on('warn', (warning: unknown) => {
+              this.logger.warn('RTC Session Warning', { warning });
+            });
+            this.logger.info('SoftphoneRTCSession initialized for VDI audio.');
+          }
+        } catch (err) {
+          this.logger.error('Failed to initialize SoftphoneRTCSession for VDI', {
+            err,
+          });
+        }
+      });
+    });
   }
 
   /**

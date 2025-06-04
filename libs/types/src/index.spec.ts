@@ -14,6 +14,7 @@ import type {
   // Application types (interfaces)
   CustomerConfig,
   BrandingConfig,
+  AudioConfiguration,
   
   // Utility types (branded types)
   UUID,
@@ -156,6 +157,16 @@ describe('Type Library', () => {
 
       expect(branding.primary_color).toBe('#1e40af');
       expect(branding.theme).toBe('light');
+    });
+
+    it('should compile audio configuration type correctly', () => {
+      const audio: AudioConfiguration = {
+        mode: 'vdi',
+        vdiOptions: { platformHint: 'citrix' },
+      };
+
+      expect(audio.mode).toBe('vdi');
+      expect(audio.vdiOptions?.platformHint).toBe('citrix');
     });
   });
 
