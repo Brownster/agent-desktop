@@ -186,15 +186,15 @@ export class ConsoleTransport implements LogTransport {
     const formatted: Record<string, unknown> = {};
 
     if (performance.duration !== undefined) {
-      formatted.duration = `${performance.duration.toFixed(2)}ms`;
+      formatted['duration'] = `${performance.duration.toFixed(2)}ms`;
     }
 
     if (performance.memory) {
-      formatted.memory = this.formatMemoryUsage(performance.memory);
+      formatted['memory'] = this.formatMemoryUsage(performance.memory);
     }
 
     if (performance.memoryDelta) {
-      formatted.memoryDelta = performance.memoryDelta;
+      formatted['memoryDelta'] = performance.memoryDelta;
     }
 
     return formatted;

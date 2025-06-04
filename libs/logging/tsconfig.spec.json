@@ -17,6 +17,7 @@
     "src/**/*.test.jsx",
     "src/**/*.spec.jsx",
     "src/**/*.d.ts",
-    "src/test-utils.d.ts"
+    "src/test-utils.d.ts",
+    "src/test-setup.ts"
   ]
 }
