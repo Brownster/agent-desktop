@@ -81,9 +81,20 @@ export class ConfigWebSocketService {
   private readonly messageQueue: WebSocketMessage[] = [];
   private isConnected = false;
 
-  constructor(options: Partial<WebSocketOptions> = {}, logger: Logger) {
+  constructor(options: Partial<WebSocketOptions> = {}, logger?: Logger) {
     this.options = { ...DEFAULT_WEBSOCKET_OPTIONS, ...options };
-    this.logger = logger.createChild('ConfigWebSocketService');
+    if (logger) {
+      this.logger = logger.createChild('ConfigWebSocketService');
+    } else {
+      // Fallback logger
+      this.logger = {
+        debug: (message, context) => console.debug(`[ConfigWebSocketService] ${message}`, context || ''),
+        info: (message, context) => console.info(`[ConfigWebSocketService] ${message}`, context || ''),
+        warn: (message, context) => console.warn(`[ConfigWebSocketService] ${message}`, context || ''),
+        error: (message, context) => console.error(`[ConfigWebSocketService] ${message}`, context || ''),
+        createChild: () => this.logger, // Simplistic child creation
+      } as Logger;
+    }
   }
 
   /**

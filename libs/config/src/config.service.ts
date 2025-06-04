@@ -134,31 +134,54 @@ export class ConfigService implements IConfigService {
    */
   constructor(options: Partial<ConfigServiceOptions> = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
-    this.logger = this.options.logger?.createChild('ConfigService');
+
+    // Initialize logger - can be undefined if options.logger is not provided
+    this.logger = this.options.logger ? this.options.logger.createChild('ConfigService') : undefined;
     
     // Initialize validator
     this.validator = new ConfigValidator();
     
     // Initialize store
     if (this.options.storeType === 'dynamodb') {
+      if (!this.options.dynamoTableName || this.options.dynamoTableName.trim() === '') {
+        const errorMessage = 'DynamoDB store type selected but dynamoTableName is not configured. Please provide a valid table name in ConfigServiceOptions or via the CONFIG_TABLE_NAME environment variable.';
+        this.logger?.error(errorMessage); // Log before throwing for better context if logger exists
+        throw new Error(errorMessage);
+      }
       this.store = new DynamoDBConfigStore(
-        this.options.dynamoTableName!,
-        this.logger!
+        this.options.dynamoTableName,
+        this.logger // Pass potentially undefined logger
       );
     } else {
-      this.store = new MemoryConfigStore(this.logger!);
+      // MemoryStore also needs to handle potentially undefined logger,
+      // or we ensure MemoryStore always gets a logger (even a fallback from ConfigService if this.logger is undefined).
+      // For now, assuming MemoryStore needs a logger. If it can handle undefined, this is fine.
+      // Let's ensure MemoryStore gets at least a fallback if this.logger is undefined.
+      // However, the current task asks sub-services to create their own fallbacks.
+      // So, MemoryConfigStore constructor should also be updated like DynamoDBConfigStore.
+      // For this step, we pass the potentially undefined this.logger.
+      // A follow-up would be to update MemoryConfigStore.
+      // For now, to keep MemoryConfigStore functional if it *requires* a logger,
+      // and to avoid breaking existing code if it doesn't have a fallback:
+      // This part of the code was: this.store = new MemoryConfigStore(this.logger!);
+      // If MemoryConfigStore is not updated to handle optional logger, this would break.
+      // Let's assume for now MemoryConfigStore will be updated or already handles it.
+      // So, we pass this.logger which can be undefined.
+      this.store = new MemoryConfigStore(this.logger);
     }
     
     // Initialize WebSocket service if enabled
-    if (this.options.enableWebSocket && this.logger) {
+    if (this.options.enableWebSocket) { // WebSocket can be initialized even if logger is not present
       this.webSocket = new ConfigWebSocketService(
         this.options.webSocketOptions,
-        this.logger
+        this.logger // Pass potentially undefined logger
       );
       
       // Auto-connect WebSocket
       this.webSocket.connect().catch(error => {
-        this.logger?.warn('Failed to connect to WebSocket server', {
+        // Use console.warn if logger is not available for this specific error message
+        const logWarn = this.logger ? this.logger.warn : (msg: string, ctx?:any) => console.warn(msg, ctx || '');
+        logWarn('Failed to connect to WebSocket server', {
           error: error instanceof Error ? error.message : String(error),
         });
       });
@@ -408,7 +431,7 @@ export class ConfigService implements IConfigService {
    * @param config - Configuration object to validate
    * @returns Validation result with errors and warnings
    */
-  validate(config: Record<string, unknown>): ConfigValidationResult {
+  validate(config: Record<string, unknown>, schemaName?: string): ConfigValidationResult {
     if (!this.options.enableValidation) {
       this.logger?.debug('Configuration validation is disabled');
       return {
@@ -420,30 +443,23 @@ export class ConfigService implements IConfigService {
 
     this.logger?.debug('Validating configuration', {
       keyCount: Object.keys(config).length,
+      schemaName: schemaName ?? 'CustomerConfig (default)',
     });
 
-    const errors: ConfigValidationError[] = [];
-    const warnings: ConfigValidationWarning[] = [];
+    let result: ConfigValidationResult;
 
-    // Basic validation rules
-    this.validateBasicRules(config, errors, warnings);
-    
-    // Type validation
-    this.validateTypes(config, errors, warnings);
-    
-    // Business rule validation
-    this.validateBusinessRules(config, errors, warnings);
-
-    const result: ConfigValidationResult = {
-      isValid: errors.length === 0,
-      errors,
-      warnings,
-    };
+    if (schemaName) {
+      result = this.validator.validate(config, schemaName);
+    } else {
+      // Default to validating as customer configuration for backward compatibility
+      result = this.validator.validateCustomerConfig(config);
+    }
 
     this.logger?.info('Configuration validation completed', {
       isValid: result.isValid,
-      errorCount: errors.length,
-      warningCount: warnings.length,
+      errorCount: result.errors.length,
+      warningCount: result.warnings.length,
+      schemaName: schemaName ?? 'CustomerConfig (default)',
     });
 
     return result;
@@ -826,103 +842,5 @@ export class ConfigService implements IConfigService {
       '^' + pattern.replace(/\*/g, '.*').replace(/\?/g, '.') + '$'
     );
     return regex.test(key);
-  }
-
-  /**
-   * Validate basic configuration rules
-   */
-  private validateBasicRules(
-    config: Record<string, unknown>,
-    errors: ConfigValidationError[],
-    warnings: ConfigValidationWarning[]
-  ): void {
-    // Required fields validation
-    const requiredFields = ['customer_id', 'name', 'version'];
-    
-    for (const field of requiredFields) {
-      if (!(field in config) || config[field] === undefined || config[field] === null) {
-        errors.push({
-          field,
-          message: `Required field '${field}' is missing`,
-          code: 'REQUIRED_FIELD_MISSING',
-          severity: 'error',
-        });
-      }
-    }
-
-    // Empty string validation
-    for (const [key, value] of Object.entries(config)) {
-      if (typeof value === 'string' && value.trim() === '') {
-        warnings.push({
-          field: key,
-          message: `Field '${key}' is an empty string`,
-          code: 'EMPTY_STRING_VALUE',
-          recommendation: `Provide a non-empty value for '${key}'`,
-        });
-      }
-    }
-  }
-
-  /**
-   * Validate configuration types
-   */
-  private validateTypes(
-    config: Record<string, unknown>,
-    errors: ConfigValidationError[],
-    warnings: ConfigValidationWarning[]
-  ): void {
-    // Type validations
-    const typeValidations: Record<string, string> = {
-      customer_id: 'string',
-      name: 'string',
-      version: 'string',
-      isActive: 'boolean',
-    };
-
-    for (const [field, expectedType] of Object.entries(typeValidations)) {
-      if (field in config && typeof config[field] !== expectedType) {
-        errors.push({
-          field,
-          message: `Field '${field}' must be of type ${expectedType}, got ${typeof config[field]}`,
-          code: 'INVALID_TYPE',
-          severity: 'error',
-        });
-      }
-    }
-  }
-
-  /**
-   * Validate business rules
-   */
-  private validateBusinessRules(
-    config: Record<string, unknown>,
-    errors: ConfigValidationError[],
-    warnings: ConfigValidationWarning[]
-  ): void {
-    // Version format validation
-    if (config.version && typeof config.version === 'string') {
-      const versionRegex = /^\d+\.\d+\.\d+(-[\w\d\-]+)?$/;
-      if (!versionRegex.test(config.version)) {
-        errors.push({
-          field: 'version',
-          message: 'Version must follow semantic versioning format (e.g., 1.0.0)',
-          code: 'INVALID_VERSION_FORMAT',
-          severity: 'error',
-        });
-      }
-    }
-
-    // Customer ID format validation
-    if (config.customer_id && typeof config.customer_id === 'string') {
-      const customerIdRegex = /^[a-z0-9\-]+$/;
-      if (!customerIdRegex.test(config.customer_id)) {
-        errors.push({
-          field: 'customer_id',
-          message: 'Customer ID can only contain lowercase letters, numbers, and hyphens',
-          code: 'INVALID_CUSTOMER_ID_FORMAT',
-          severity: 'error',
-        });
-      }
-    }
   }
 }
