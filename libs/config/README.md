@@ -35,7 +35,7 @@ const host = config.get<string>('app.database.host');
 const port = config.get<number>('app.database.port');
 
 // Watch for changes
-const unwatch = config.watch('app.database.*', (event) => {
+const unwatch = config.watch('app.database.*', event => {
   console.log(`Config changed: ${event.key} = ${event.newValue}`);
 });
 ```
@@ -84,11 +84,11 @@ import { ConfigService, ConfigSource } from '@agent-desktop/config';
 
 const config = new ConfigService({
   sources: [
-    ConfigSource.ENVIRONMENT,   // Process environment variables
-    ConfigSource.FILE,          // Configuration files
-    ConfigSource.DATABASE,      // Customer configurations
-    ConfigSource.REMOTE,        // Remote configuration service
-    ConfigSource.OVERRIDE,      // Runtime overrides
+    ConfigSource.ENVIRONMENT, // Process environment variables
+    ConfigSource.FILE, // Configuration files
+    ConfigSource.DATABASE, // Customer configurations
+    ConfigSource.REMOTE, // Remote configuration service
+    ConfigSource.OVERRIDE, // Runtime overrides
   ],
 });
 
@@ -100,19 +100,19 @@ config.set('api.endpoint', 'https://api.example.com', ConfigSource.ENVIRONMENT);
 
 ```typescript
 // Watch specific keys
-const unwatch1 = config.watch('app.database.host', (event) => {
+const unwatch1 = config.watch('app.database.host', event => {
   console.log('Database host changed:', event.newValue);
   // Reconnect to database with new host
 });
 
 // Watch with wildcards
-const unwatch2 = config.watch('app.modules.*', (event) => {
+const unwatch2 = config.watch('app.modules.*', event => {
   console.log('Module configuration changed:', event.key);
   // Reload affected modules
 });
 
 // Watch all changes
-const unwatch3 = config.watch('*', (event) => {
+const unwatch3 = config.watch('*', event => {
   console.log('Any configuration changed');
 });
 
@@ -130,9 +130,7 @@ const customerConfig = {
   customer_id: 'acme-corp',
   name: 'ACME Corporation',
   version: '1.0.0',
-  modules: [
-    { module_id: 'ccp-core', enabled: true },
-  ],
+  modules: [{ module_id: 'ccp-core', enabled: true }],
   // ... other configuration
 };
 
@@ -161,7 +159,7 @@ const result = await config.loadCustomerConfig('acme-corp');
 if (result.success) {
   const customerConfig = result.data;
   console.log('Loaded config for:', customerConfig.name);
-  
+
   // Apply customer configuration
   customerConfig.modules.forEach(module => {
     config.set(`modules.${module.module_id}`, module);
@@ -307,13 +305,14 @@ validator.addSchema('CustomModule', {
 
 ```typescript
 const config = new ConfigService({
-  logger: myLogger,           // Custom logger instance
-  enableWatching: true,       // Enable change notifications
-  enableValidation: true,     // Enable validation
-  enableCaching: true,        // Enable caching
-  cacheSize: 1000,           // Maximum cache entries
-  cacheTtl: 300000,          // Cache TTL in milliseconds (5 minutes)
-  sources: [                 // Configuration sources in priority order
+  logger: myLogger, // Custom logger instance
+  enableWatching: true, // Enable change notifications
+  enableValidation: true, // Enable validation
+  enableCaching: true, // Enable caching
+  cacheSize: 1000, // Maximum cache entries
+  cacheTtl: 300000, // Cache TTL in milliseconds (5 minutes)
+  sources: [
+    // Configuration sources in priority order
     ConfigSource.OVERRIDE,
     ConfigSource.DATABASE,
     ConfigSource.FILE,
@@ -321,6 +320,13 @@ const config = new ConfigService({
   ],
 });
 ```
+
+### WebSocket Options
+
+The `webSocketOptions.maxQueueSize` option limits how many outbound WebSocket
+messages may be buffered while the connection is unavailable. The default value
+is **100** messages. When this threshold is exceeded, the oldest queued message
+is dropped before adding a new one.
 
 ### Performance Optimization
 
@@ -334,7 +340,7 @@ config.set('app.module2.enabled', false);
 const cachedValue = config.get('frequently.accessed.setting');
 
 // Watch efficiently with specific patterns
-const unwatch = config.watch('modules.*.enabled', (event) => {
+const unwatch = config.watch('modules.*.enabled', event => {
   // Only notified when module enabled state changes
 });
 ```
@@ -344,11 +350,11 @@ const unwatch = config.watch('modules.*.enabled', (event) => {
 ```typescript
 try {
   const result = await config.loadCustomerConfig('customer-id');
-  
+
   if (!result.success) {
     // Handle configuration loading error
     console.error('Config load failed:', result.error.message);
-    
+
     // Fall back to default configuration
     const defaultConfig = getDefaultConfiguration();
     applyConfiguration(defaultConfig);
@@ -375,16 +381,16 @@ const customerResult = await config.loadCustomerConfig(customerId);
 
 if (customerResult.success) {
   const customerConfig = customerResult.data;
-  
+
   // Load modules based on configuration
   const enabledModules = customerConfig.modules.filter(m => m.enabled);
   await moduleRegistry.loadModules(enabledModules);
-  
+
   // Watch for module configuration changes
-  config.watch('modules.*', async (event) => {
+  config.watch('modules.*', async event => {
     if (event.key.endsWith('.enabled')) {
       const moduleId = event.key.split('.')[1];
-      
+
       if (event.newValue) {
         await moduleRegistry.loadModule(moduleId);
       } else {
@@ -410,7 +416,7 @@ const config = new ConfigService({
 });
 
 // Configuration changes are automatically logged
-config.watch('*', (event) => {
+config.watch('*', event => {
   logger.info('Configuration changed', {
     key: event.key,
     oldValue: event.oldValue,
@@ -471,7 +477,7 @@ config.watch('modules.*.enabled', handleModuleToggle);
 // config.watch('*', handler); // Can be noisy
 
 // Use meaningful watch handlers
-const unwatchDatabase = config.watch('database.*', async (event) => {
+const unwatchDatabase = config.watch('database.*', async event => {
   if (event.key === 'database.host' || event.key === 'database.port') {
     await reconnectDatabase();
   }
@@ -486,9 +492,7 @@ class MyComponent {
   private unwatchConfig: (() => void)[] = [];
 
   constructor(private config: ConfigService) {
-    this.unwatchConfig.push(
-      config.watch('component.setting', this.handleSettingChange)
-    );
+    this.unwatchConfig.push(config.watch('component.setting', this.handleSettingChange));
   }
 
   destroy() {
