@@ -11,7 +11,7 @@ export type Environment = 'development' | 'staging' | 'production';
 /**
  * Log level configuration
  */
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+export type ConfigLogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 
 /**
  * VDI platform types supported by the application
@@ -39,7 +39,7 @@ export interface BaseConfig {
  */
 export interface AppConfig extends BaseConfig {
   readonly environment: Environment;
-  readonly logLevel: LogLevel;
+  readonly logLevel: ConfigLogLevel;
   readonly apiEndpoint: string;
   readonly websocketEndpoint: string;
   readonly maxRetryAttempts: number;

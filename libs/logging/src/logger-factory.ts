@@ -3,7 +3,7 @@
  * @module @agent-desktop/logging
  */
 
-import type { LogLevel, LogTransport } from '@agent-desktop/types';
+import { LogLevel, type LogTransport } from '@agent-desktop/types';
 import { Logger, type LoggerConfig } from './logger';
 import { ConsoleTransport, FileTransport, CloudWatchTransport } from './transports';
 

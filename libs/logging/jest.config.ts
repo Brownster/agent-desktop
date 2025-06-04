@@ -6,8 +6,12 @@ module.exports = {
   transform: {
     '^.+\\.[tj]s$': [
       'ts-jest',
-      { tsconfig: '<rootDir>/tsconfig.spec.json' },
+      { tsconfig: '<rootDir>/tsconfig.spec.json', isolatedModules: true },
     ],
+  },
+  moduleNameMapper: {
+    '^@agent-desktop/types$': '<rootDir>/test-types.ts',
+    '^@agent-desktop/(.*)$': '<rootDir>/../../libs/$1/src',
   },
   moduleFileExtensions: ['ts', 'js', 'html'],
   coverageDirectory: '../../coverage/libs/logging',

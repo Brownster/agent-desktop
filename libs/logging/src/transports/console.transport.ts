@@ -3,7 +3,7 @@
  * @module @agent-desktop/logging/transports
  */
 
-import type { LogLevel, LogEntry, LogTransport } from '@agent-desktop/types';
+import { LogLevel, type LogEntry, type LogTransport } from '@agent-desktop/types';
 
 /**
  * Console transport configuration

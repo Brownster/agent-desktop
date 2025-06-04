@@ -3,7 +3,7 @@
  */
 
 // Import LogLevel from types library
-const { LogLevel } = require('@agent-desktop/types');
+import { LogLevel } from '@agent-desktop/types';
 import { ConsoleTransport } from './console.transport';
 
 describe('ConsoleTransport', () => {

@@ -3,13 +3,13 @@
  * @module @agent-desktop/logging
  */
 
-import type {
+import {
   LogLevel,
-  LogEntry,
-  LogTransport,
-  CorrelationContext,
-  PerformanceMetrics,
-  ErrorInfo,
+  type LogEntry,
+  type LogTransport,
+  type CorrelationContext,
+  type PerformanceMetrics,
+  type ErrorInfo,
 } from '@agent-desktop/types';
 
 /**
