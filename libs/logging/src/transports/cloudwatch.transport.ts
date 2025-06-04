@@ -60,8 +60,7 @@ export class CloudWatchTransport implements LogTransport {
   
   private readonly config: CloudWatchTransportConfig;
   private readonly buffer: CloudWatchLogEvent[] = [];
-  private flushTimer?: NodeJS.Timeout;
-  private sequenceToken?: string;
+  private flushTimer: NodeJS.Timeout | undefined;
   private isShuttingDown = false;
 
   /**
@@ -69,7 +68,7 @@ export class CloudWatchTransport implements LogTransport {
    * 
    * @param config - Transport configuration
    */
-  constructor(config: CloudWatchTransportConfig) {
+  constructor(config: Partial<CloudWatchTransportConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config } as CloudWatchTransportConfig;
     this.initialize();
   }
@@ -204,7 +203,7 @@ export class CloudWatchTransport implements LogTransport {
     await new Promise(resolve => setTimeout(resolve, 100));
 
     // Mock sequence token update
-    this.sequenceToken = `mock_sequence_token_${Date.now()}`;
+    // Sequence token handling would be implemented with AWS SDK
 
     // In a real implementation, this would be:
     /*
@@ -212,11 +211,12 @@ export class CloudWatchTransport implements LogTransport {
       logGroupName: this.config.logGroupName,
       logStreamName: this.config.logStreamName,
       logEvents: sortedEvents,
-      sequenceToken: this.sequenceToken,
+      // sequenceToken would be set when using the AWS SDK
+      sequenceToken: undefined,
     };
 
     const result = await this.cloudWatchLogs.putLogEvents(params).promise();
-    this.sequenceToken = result.nextSequenceToken;
+    // this._sequenceToken = result.nextSequenceToken;
     */
 
     // Send custom metrics if enabled
@@ -268,7 +268,7 @@ export class CloudWatchTransport implements LogTransport {
 
       const stream = result.logStreams?.find(s => s.logStreamName === this.config.logStreamName);
       if (stream) {
-        this.sequenceToken = stream.uploadSequenceToken;
+        // this._sequenceToken = stream.uploadSequenceToken;
       } else {
         await this.cloudWatchLogs.createLogStream({
           logGroupName: this.config.logGroupName,

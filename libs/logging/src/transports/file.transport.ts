@@ -53,7 +53,7 @@ export class FileTransport implements LogTransport {
   
   private readonly config: FileTransportConfig;
   private readonly buffer: string[] = [];
-  private flushTimer?: NodeJS.Timeout;
+  private flushTimer: NodeJS.Timeout | undefined;
   private isWriting = false;
   private pendingWrites: string[] = [];
 
