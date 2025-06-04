@@ -1,0 +1,33 @@
+# Deployment Guide
+
+This document outlines how to deploy the CCP applications and infrastructure.
+
+## Staging Deployment
+
+Use the following command to build and deploy the client application to the staging environment:
+
+```bash
+pnpm nx deploy:staging ccp-client
+```
+
+This command runs the project build and uploads the static files to the `ccp-client-staging-<AWS_ACCOUNT_ID>` S3 bucket. The bucket will be created if it does not already exist.
+
+## Production Deployment
+
+To deploy to the production environment, run:
+
+```bash
+pnpm nx deploy:prod ccp-client
+```
+
+This performs a production build and syncs the files to the `ccp-client-production-<AWS_ACCOUNT_ID>` bucket. A CloudFront invalidation is triggered automatically when a distribution is detected.
+
+## Infrastructure
+
+Infrastructure resources for the configuration API are managed using AWS CDK inside the `infrastructure/aws-cdk` package. Deployment scripts are provided there for each environment:
+
+```bash
+pnpm run deploy:dev     # development
+pnpm run deploy:staging # staging
+pnpm run deploy:prod    # production
+```

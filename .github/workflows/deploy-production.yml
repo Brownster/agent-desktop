@@ -204,102 +204,10 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Download production build
-        uses: actions/download-artifact@v3
-        with:
-          name: ccp-admin-production-build
-          path: apps/ccp-admin/dist
-
-      - name: Deploy to S3 with versioning
-        run: |
-          BUCKET_NAME="ccp-admin-production-${{ secrets.AWS_ACCOUNT_ID }}"
-          VERSION="${{ needs.pre-deployment.outputs.version }}"
-          
-          # Create bucket if it doesn't exist
-          aws s3 mb s3://$BUCKET_NAME --region ${{ env.AWS_REGION }} || true
-          
-          # Enable versioning
-          aws s3api put-bucket-versioning --bucket $BUCKET_NAME --versioning-configuration Status=Enabled
-          
-          # Create backup of current version
-          aws s3 sync s3://$BUCKET_NAME s3://$BUCKET_NAME-backup-$(date +%Y%m%d-%H%M%S) || true
-          
-          # Deploy new version
-          aws s3 sync apps/ccp-admin/dist s3://$BUCKET_NAME --delete \
-            --metadata version=$VERSION \
-            --cache-control "public, max-age=86400" \
-            --exclude "*.html" \
-            --exclude "*.map"
-          
-          # Deploy HTML files with shorter cache
-          aws s3 sync apps/ccp-admin/dist s3://$BUCKET_NAME \
-            --exclude "*" \
-            --include "*.html" \
-            --cache-control "public, max-age=3600, must-revalidate"
-          
-          # Configure bucket for static website hosting
-          aws s3 website s3://$BUCKET_NAME --index-document index.html --error-document index.html
-
-      - name: Create/Update CloudFront distribution
-        id: cloudfront
-        run: |
-          BUCKET_NAME="ccp-admin-production-${{ secrets.AWS_ACCOUNT_ID }}"
-          DOMAIN_NAME="$BUCKET_NAME.s3.amazonaws.com"
-          
-          # Check if distribution exists
-          DISTRIBUTION_ID=$(aws cloudfront list-distributions --query "DistributionList.Items[?Origins.Items[0].DomainName=='$DOMAIN_NAME'].Id" --output text)
-          
-          if [ -z "$DISTRIBUTION_ID" ] || [ "$DISTRIBUTION_ID" = "None" ]; then
-            echo "Creating new CloudFront distribution..."
-            
-            # Create distribution config
-            cat > cloudfront-config.json << EOF
-          {
-            "CallerReference": "ccp-admin-production-$(date +%s)",
-            "Comment": "CCP Admin Dashboard Production",
-            "DefaultCacheBehavior": {
-              "TargetOriginId": "S3Origin",
-              "ViewerProtocolPolicy": "redirect-to-https",
-              "TrustedSigners": {
-                "Enabled": false,
-                "Quantity": 0
-              },
-              "ForwardedValues": {
-                "QueryString": false,
-                "Cookies": {"Forward": "none"}
-              },
-              "MinTTL": 0,
-              "DefaultTTL": 86400,
-              "MaxTTL": 31536000
-            },
-            "Origins": {
-              "Quantity": 1,
-              "Items": [
-                {
-                  "Id": "S3Origin",
-                  "DomainName": "$DOMAIN_NAME",
-                  "S3OriginConfig": {
-                    "OriginAccessIdentity": ""
-                  }
-                }
-              ]
-            },
-            "Enabled": true,
-            "PriceClass": "PriceClass_100"
-          }
-          EOF
-            
-            DISTRIBUTION_ID=$(aws cloudfront create-distribution --distribution-config file://cloudfront-config.json --query 'Distribution.Id' --output text)
-            echo "Created distribution: $DISTRIBUTION_ID"
-          fi
-          
-          # Get distribution domain name
-          DISTRIBUTION_DOMAIN=$(aws cloudfront get-distribution --id $DISTRIBUTION_ID --query 'Distribution.DomainName' --output text)
-          
-          # Invalidate cache
-          aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/*"
-          
-          echo "cloudfront-admin-url=https://$DISTRIBUTION_DOMAIN" >> $GITHUB_OUTPUT
+      - name: Deploy via Nx
+        run: pnpm nx deploy:prod ccp-admin
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
 
   # Deploy Client Application to production
   deploy-client-prod:
@@ -318,24 +226,10 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Download production build
-        uses: actions/download-artifact@v3
-        with:
-          name: ccp-client-production-build
-          path: apps/ccp-client/dist
-
-      - name: Deploy to S3 with CDN
-        run: |
-          BUCKET_NAME="ccp-client-production-${{ secrets.AWS_ACCOUNT_ID }}"
-          VERSION="${{ needs.pre-deployment.outputs.version }}"
-          
-          # Create bucket and deploy similar to admin dashboard
-          aws s3 mb s3://$BUCKET_NAME --region ${{ env.AWS_REGION }} || true
-          aws s3api put-bucket-versioning --bucket $BUCKET_NAME --versioning-configuration Status=Enabled
-          
-          # Backup and deploy
-          aws s3 sync s3://$BUCKET_NAME s3://$BUCKET_NAME-backup-$(date +%Y%m%d-%H%M%S) || true
-          aws s3 sync apps/ccp-client/dist s3://$BUCKET_NAME --delete --metadata version=$VERSION
+      - name: Deploy via Nx
+        run: pnpm nx deploy:prod ccp-client
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
 
   # Production health checks
   health-checks:

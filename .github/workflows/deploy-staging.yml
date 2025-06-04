@@ -170,37 +170,10 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Download build artifacts
-        if: needs.build-apps.result == 'success'
-        uses: actions/download-artifact@v3
-        with:
-          name: ccp-admin-staging-build
-          path: apps/ccp-admin/dist
-
-      - name: Deploy to S3
-        run: |
-          # Create S3 bucket if it doesn't exist
-          aws s3 mb s3://ccp-admin-staging-${{ secrets.AWS_ACCOUNT_ID }} --region ${{ env.AWS_REGION }} || true
-          
-          # Sync files to S3
-          aws s3 sync apps/ccp-admin/dist s3://ccp-admin-staging-${{ secrets.AWS_ACCOUNT_ID }} --delete
-          
-          # Configure bucket for static website hosting
-          aws s3 website s3://ccp-admin-staging-${{ secrets.AWS_ACCOUNT_ID }} --index-document index.html --error-document index.html
-
-      - name: Invalidate CloudFront
-        run: |
-          # Get CloudFront distribution ID (if exists)
-          DISTRIBUTION_ID=$(aws cloudfront list-distributions --query 'DistributionList.Items[?Origins.Items[0].DomainName==`ccp-admin-staging-${{ secrets.AWS_ACCOUNT_ID }}.s3.amazonaws.com`].Id' --output text)
-          
-          if [ ! -z "$DISTRIBUTION_ID" ] && [ "$DISTRIBUTION_ID" != "None" ]; then
-            aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/*"
-          fi
-
-      - name: Update environment URLs
-        run: |
-          echo "Admin Dashboard URL: http://ccp-admin-staging-${{ secrets.AWS_ACCOUNT_ID }}.s3-website-${{ env.AWS_REGION }}.amazonaws.com"
-          echo "Config API URL: ${{ needs.deploy-infrastructure.outputs.config-api-url }}"
+      - name: Deploy via Nx
+        run: pnpm nx deploy:staging ccp-admin
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
 
   # Deploy CCP Client Application
   deploy-client:
@@ -220,23 +193,10 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Download build artifacts
-        if: needs.build-apps.result == 'success'
-        uses: actions/download-artifact@v3
-        with:
-          name: ccp-client-staging-build
-          path: apps/ccp-client/dist
-
-      - name: Deploy to S3
-        run: |
-          # Create S3 bucket if it doesn't exist
-          aws s3 mb s3://ccp-client-staging-${{ secrets.AWS_ACCOUNT_ID }} --region ${{ env.AWS_REGION }} || true
-          
-          # Sync files to S3
-          aws s3 sync apps/ccp-client/dist s3://ccp-client-staging-${{ secrets.AWS_ACCOUNT_ID }} --delete
-          
-          # Configure bucket for static website hosting
-          aws s3 website s3://ccp-client-staging-${{ secrets.AWS_ACCOUNT_ID }} --index-document index.html --error-document index.html
+      - name: Deploy via Nx
+        run: pnpm nx deploy:staging ccp-client
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
 
   # Run smoke tests
   smoke-tests:
