@@ -4,7 +4,7 @@ module.exports = {
   ...nxPreset,
   testEnvironment: 'jsdom',
   moduleNameMapper: {
-    '^@agent-desktop/(.*)$': '<rootDir>/libs/$1/src',
+    '^@agent-desktop/(.*)$': '<rootDir>/../../libs/$1/src',
   },
   collectCoverageFrom: [
     'libs/**/*.{ts,tsx}',
