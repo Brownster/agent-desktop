@@ -150,6 +150,8 @@ The dashboard integrates with the Configuration API for:
 - Recent activity feed
 - Quick action buttons
 - Key metrics and statistics
+- Live metrics fetched via `useAnalyticsDashboard`
+- Recent activity loaded using `useAuditLogs`
 
 ### Customer Management
 - List all customers with filtering and search
@@ -157,6 +159,7 @@ The dashboard integrates with the Configuration API for:
 - Edit existing customer settings
 - View detailed customer information
 - Manage customer-specific modules
+- Customer list fetched via `useCustomers`
 
 ### Module Management
 - Browse available modules by category
