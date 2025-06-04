@@ -57,3 +57,11 @@ export {
   success,
   failure,
 } from './utils/common.types';
+
+// Re-export branded utility types
+export type {
+  UUID,
+  Email,
+  PhoneNumber,
+  // include other branded types if desired
+} from './utils/common.types';
