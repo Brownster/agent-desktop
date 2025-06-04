@@ -1,6 +1,7 @@
 import { ModuleHealthChecker } from './module-health';
-import type { ModuleID, Result } from '@agent-desktop/types';
-import type { IModule, ModuleHealthStatus } from './base-module';
+import type { ModuleID, ModuleConfig, Result } from '@agent-desktop/types';
+import type { IModule, ModuleHealthStatus, ModuleContext } from './base-module';
+import { ModuleStatus, ModuleLoadStrategy } from './base-module';
 
 class TestModule implements IModule {
   metadata = {
@@ -11,7 +12,7 @@ class TestModule implements IModule {
     author: 'tester',
     dependencies: [],
     permissions: [],
-    loadStrategy: 'eager',
+    loadStrategy: ModuleLoadStrategy.EAGER,
     position: 'main',
     priority: 1,
     tags: [],
@@ -19,11 +20,35 @@ class TestModule implements IModule {
 
   constructor(private health: () => Promise<ModuleHealthStatus>) {}
 
-  status: any = 'running';
+  context?: ModuleContext;
+  status: ModuleStatus = ModuleStatus.RUNNING;
+
+  onInitialize = async (
+    _context: ModuleContext
+  ): Promise<Result<void, Error>> => ({ success: true, data: undefined });
+  onStart = async (
+    _context: ModuleContext
+  ): Promise<Result<void, Error>> => ({ success: true, data: undefined });
+  onStop = async (
+    _context: ModuleContext
+  ): Promise<Result<void, Error>> => ({ success: true, data: undefined });
+  onDestroy = async (
+    _context: ModuleContext
+  ): Promise<Result<void, Error>> => ({ success: true, data: undefined });
+  onConfigChange = async (
+    _newConfig: ModuleConfig,
+    _oldConfig: ModuleConfig,
+    _context: ModuleContext
+  ): Promise<Result<void, Error>> => ({ success: true, data: undefined });
+  onDependencyChange = async (
+    _dependencyId: ModuleID,
+    _status: ModuleStatus,
+    _context: ModuleContext
+  ): Promise<Result<void, Error>> => ({ success: true, data: undefined });
 
   getHealth = () => this.health();
   getMetrics = async () => ({ });
-  validateConfig = () => ({ success: true, data: undefined } as Result<void, Error>);
+  validateConfig = (_config: ModuleConfig) => ({ success: true, data: undefined } as Result<void, Error>);
 }
 
 describe('ModuleHealthChecker', () => {
