@@ -14,7 +14,9 @@
   },
   "dependencies": {
     "@agent-desktop/types": "workspace:*",
-    "@agent-desktop/logging": "workspace:*"
+    "@agent-desktop/logging": "workspace:*",
+    "@aws-sdk/client-dynamodb": "^3.500.0",
+    "@aws-sdk/lib-dynamodb": "^3.500.0"
   },
   "devDependencies": {
     "typescript": "^5.0.2",
