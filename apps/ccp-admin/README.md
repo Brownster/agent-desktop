@@ -1,28 +1,52 @@
 # CCP Admin Dashboard
 
-A modern React-based configuration admin dashboard for Amazon Connect CCP (Contact Control Panel).
+A comprehensive administrative dashboard for managing Amazon Connect CCP configurations, modules, and analytics with enterprise-grade features.
 
-## Features
+## Overview
 
-### 🎯 Core Functionality
-- **Customer Management**: Create, edit, and manage customer configurations
-- **Module Management**: Browse, install, and configure available modules
-- **Real-time Dashboard**: Monitor system health and deployment status
-- **Settings Management**: Configure system preferences and security settings
+The CCP Admin Dashboard provides a centralized interface for:
 
-### 🎨 User Interface
-- **Modern Design**: Clean, professional interface built with Tailwind CSS
-- **Responsive Layout**: Optimized for desktop, tablet, and mobile devices
-- **Dark/Light Theme**: Supports both light and dark themes
-- **Accessibility**: WCAG 2.1 compliant with keyboard navigation support
+- **Customer Management**: CRUD operations for customer configurations
+- **Module Catalog**: Browse, install, and manage CCP modules
+- **Analytics Dashboard**: Real-time metrics and performance monitoring
+- **System Administration**: Configuration management and audit trails
 
-### 🔧 Technical Features
-- **TypeScript**: Full type safety and enhanced developer experience
-- **React 18**: Latest React features including Suspense and concurrent rendering
-- **Vite**: Fast development server and optimized production builds
-- **React Query**: Intelligent data fetching and caching
-- **React Router**: Client-side routing with nested routes
-- **React Hook Form**: Performant forms with validation
+## Architecture
+
+### Technology Stack
+
+- **Frontend**: React 18 + TypeScript 5.2+
+- **State Management**: Zustand + React Query
+- **UI Framework**: Tailwind CSS + Headless UI
+- **Real-time**: WebSocket connections
+- **Forms**: React Hook Form + Zod validation
+- **Build Tool**: Vite + SWC
+
+### API Service Layer
+
+The application features a comprehensive API service layer with:
+
+- **Type-safe API clients** for all backend operations
+- **React Query integration** for caching and state management
+- **WebSocket services** for real-time updates
+- **Error handling** with user-friendly notifications
+- **Optimistic updates** for better UX
+
+#### Core Services
+
+```typescript
+// Customer management
+import { useCustomers, useCreateCustomer, useUpdateCustomer } from './services/queries';
+
+// Module operations
+import { useModuleCatalog, useEnableModule } from './services/queries';
+
+// Analytics and monitoring
+import { useAnalyticsDashboard, useSystemMetrics } from './services/queries';
+
+// Real-time updates
+import { useRealtimeCustomers, useWebSocketConnection } from './services/websocket';
+```
 
 ## Getting Started
 
