@@ -188,7 +188,7 @@ interface ContactStoreState {
  */
 export const useContactStore = create<ContactStoreState>()(
   subscribeWithSelector(
-    immer((set, get) => ({
+    immer((set, _get) => ({
       // Initial state
       contacts: [],
       activeContactId: null,
@@ -214,7 +214,7 @@ export const useContactStore = create<ContactStoreState>()(
       updateContact: (contactId: string, updates: Partial<Contact>) =>
         set((state) => {
           const contactIndex = state.contacts.findIndex(c => c.contactId === contactId);
-          if (contactIndex >= 0) {
+          if (contactIndex >= 0 && state.contacts[contactIndex]) {
             Object.assign(state.contacts[contactIndex], updates);
           }
         }),
@@ -225,7 +225,7 @@ export const useContactStore = create<ContactStoreState>()(
           
           // Clear active contact if it was removed
           if (state.activeContactId === contactId) {
-            state.activeContactId = state.contacts.length > 0 ? state.contacts[0].contactId : null;
+            state.activeContactId = state.contacts.length > 0 && state.contacts[0] ? state.contacts[0].contactId : null;
           }
         }),
 

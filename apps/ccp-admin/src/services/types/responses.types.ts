@@ -10,7 +10,6 @@ import type {
 } from '@agent-desktop/types';
 import type {
   PaginatedResponse,
-  CustomerMetrics,
   UsageMetrics,
   ActivityMetrics,
   SystemMetrics,
@@ -19,7 +18,6 @@ import type {
   SystemStatus,
   ConnectionMetrics,
   QueueMetrics,
-  IntegrationTestResult,
 } from './api.types';
 
 /**
@@ -41,7 +39,7 @@ export interface CustomerResponse {
   readonly modules: readonly ModuleConfig[];
   readonly integrations: readonly IntegrationConfig[];
   readonly usage: UsageMetrics;
-  readonly activity: readonly ActivityMetrics['events'];
+  activity: ActivityMetrics['events'];
 }
 
 /**

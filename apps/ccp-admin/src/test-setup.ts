@@ -42,8 +42,8 @@ class MockWebSocket {
     this.url = url;
   }
 
-  send(data: string): void {}
-  close(code?: number, reason?: string): void {}
+  send(_data: string): void {}
+  close(_code?: number, _reason?: string): void {}
 }
 
 // Mock global fetch
@@ -63,11 +63,16 @@ global.console = {
 };
 
 // Mock IntersectionObserver
-global.IntersectionObserver = class IntersectionObserver {
+(global as any).IntersectionObserver = class IntersectionObserver {
+  root = null;
+  rootMargin = '';
+  thresholds = [];
+  
   constructor() {}
   disconnect() {}
   observe() {}
   unobserve() {}
+  takeRecords() { return []; }
 };
 
 // Mock ResizeObserver

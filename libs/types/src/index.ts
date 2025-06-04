@@ -16,7 +16,7 @@ export * from './connect/queue.types';
 export * from './connect/streams.types';
 
 // Application types
-export {
+export type {
   CustomerConfig,
   BrandingConfig,
   FeatureFlags,
@@ -45,7 +45,7 @@ export * from './app/integration.types';
 export * from './app/branding.types';
 
 // Utility types
-export {
+export type {
   Result,
   Success,
   Failure,

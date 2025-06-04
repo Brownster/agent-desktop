@@ -216,13 +216,13 @@ export function useRealtimeAlerts() {
 
   const markAsRead = useCallback((alertId: string) => {
     setAlerts(prev => prev.map(alert => 
-      alert.type === alertId ? { ...alert, data: { ...alert.data, read: true } } : alert
+      alert.type === alertId ? { ...alert, data: { ...(alert.data as object), read: true } } : alert
     ));
     setUnreadCount(prev => Math.max(0, prev - 1));
   }, []);
 
   const markAllAsRead = useCallback(() => {
-    setAlerts(prev => prev.map(alert => ({ ...alert, data: { ...alert.data, read: true } })));
+    setAlerts(prev => prev.map(alert => ({ ...alert, data: { ...(alert.data as object), read: true } })));
     setUnreadCount(0);
   }, []);
 
@@ -230,7 +230,7 @@ export function useRealtimeAlerts() {
     setAlerts(prev => prev.filter(alert => alert.type !== alertId));
     setUnreadCount(prev => {
       const alert = alerts.find(a => a.type === alertId);
-      return alert && !('read' in alert.data && alert.data.read) ? Math.max(0, prev - 1) : prev;
+      return alert && !('read' in (alert.data as any) && (alert.data as any).read) ? Math.max(0, prev - 1) : prev;
     });
   }, [alerts]);
 

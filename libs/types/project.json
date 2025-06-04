@@ -39,6 +39,8 @@
     "type-check": {
       "executor": "@nx/js:tsc",
       "options": {
+        "main": "libs/types/src/index.ts",
+        "outputPath": "dist/libs/types",
         "tsConfig": "libs/types/tsconfig.lib.json",
         "noEmit": true
       }

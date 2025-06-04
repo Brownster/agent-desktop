@@ -75,8 +75,8 @@ export class AdminWebSocketService {
   private connectionState: ConnectionState = 'disconnected';
   private reconnectAttempts = 0;
   private readonly maxReconnectAttempts = 10;
-  private reconnectTimer?: NodeJS.Timeout;
-  private heartbeatTimer?: NodeJS.Timeout;
+  private reconnectTimer?: NodeJS.Timeout | null;
+  private heartbeatTimer?: NodeJS.Timeout | null;
   private readonly eventListeners = new Map<string, Set<EventCallback>>();
 
   constructor(options: Partial<WebSocketOptions> = {}, logger?: Logger) {
@@ -168,7 +168,7 @@ export class AdminWebSocketService {
     const subscription: Subscription = {
       id: subscriptionId,
       eventType,
-      customerId,
+      customerId: customerId ?? '',
       callback: callback as EventCallback,
       unsubscribe,
     };
@@ -188,7 +188,7 @@ export class AdminWebSocketService {
       this.wsService.subscribe(
         customerId,
         'admin.*',
-        (event) => this.handleConfigChangeEvent(event, customerId)
+        (event: any) => this.handleConfigChangeEvent(event, customerId)
       );
     }
 
@@ -447,7 +447,7 @@ export class AdminWebSocketService {
   private stopHeartbeat(): void {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
-      this.heartbeatTimer = undefined;
+      this.heartbeatTimer = null;
     }
   }
 
@@ -457,7 +457,7 @@ export class AdminWebSocketService {
   private clearReconnectTimer(): void {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = undefined;
+      this.reconnectTimer = null;
     }
   }
 

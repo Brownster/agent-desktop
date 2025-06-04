@@ -64,12 +64,12 @@ function AgentStatus({ onStateChange, className }: AgentStatusProps): React.Reac
   /**
    * Get the current state color
    */
-  const stateColor = getStateColor(currentState, unavailableReason);
+  const stateColor = getStateColor(currentState, unavailableReason ?? undefined);
   
   /**
    * Get the current state label
    */
-  const stateLabel = getStateLabel(currentState, unavailableReason);
+  const stateLabel = getStateLabel(currentState, unavailableReason ?? undefined);
 
   return (
     <div className={clsx('bg-white border border-gray-200 rounded-lg shadow-sm', className)}>

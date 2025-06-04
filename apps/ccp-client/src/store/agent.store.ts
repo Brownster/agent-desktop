@@ -131,7 +131,7 @@ const INITIAL_STATS: AgentStats = {
  */
 export const useAgentStore = create<AgentStoreState>()(
   subscribeWithSelector(
-    immer((set, get) => ({
+    immer((set, _get) => ({
       // Initial state
       agent: null,
       currentState: 'Offline',

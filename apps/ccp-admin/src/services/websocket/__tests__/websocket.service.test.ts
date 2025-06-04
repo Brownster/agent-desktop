@@ -3,8 +3,8 @@
  * @module services/websocket/__tests__/websocket.service
  */
 
-import { WebSocketService } from '../websocket.service';
-import { ApiError } from '../../errors';
+import { AdminWebSocketService } from '../websocket.service';
+import { APIError } from '../../errors';
 
 // Mock WebSocket
 class MockWebSocket {
@@ -29,18 +29,18 @@ class MockWebSocket {
     }, 10);
   }
 
-  send(data: string): void {
+  send(_data: string): void {
     if (this.readyState !== MockWebSocket.OPEN) {
       throw new Error('WebSocket is not open');
     }
     // Simulate message sent successfully
   }
 
-  close(code?: number, reason?: string): void {
+  close(_code?: number, _reason?: string): void {
     this.readyState = MockWebSocket.CLOSING;
     setTimeout(() => {
       this.readyState = MockWebSocket.CLOSED;
-      const closeEvent = new CloseEvent('close', { code: code || 1000, reason });
+      const closeEvent = new CloseEvent('close', { code: _code ?? 1000, reason: _reason });
       this.onclose?.(closeEvent);
     }, 10);
   }
@@ -64,12 +64,12 @@ class MockWebSocket {
 // Mock global WebSocket
 (global as any).WebSocket = MockWebSocket;
 
-describe('WebSocketService', () => {
-  let service: WebSocketService;
+describe('AdminWebSocketService', () => {
+  let service: AdminWebSocketService;
   let mockConsole: jest.SpyInstance;
 
   beforeEach(() => {
-    service = new WebSocketService();
+    service = new AdminWebSocketService();
     mockConsole = jest.spyOn(console, 'error').mockImplementation();
   });
 

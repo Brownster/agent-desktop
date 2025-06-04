@@ -480,7 +480,11 @@ export class ConnectService {
         routingProfile: {
           name: routingProfile?.name || 'Unknown',
           routingProfileId: routingProfile?.routingProfileId || 'unknown',
-          queues: routingProfile?.queues || [],
+          queues: (routingProfile?.queues || []).map(queue => ({
+            ...queue,
+            priority: 1,
+            delay: 0
+          })),
         },
         permissions: {
           canMakeOutbound: permissions.includes('outboundCall'),
@@ -594,7 +598,7 @@ export class ConnectService {
   /**
    * Handle contact ACW
    */
-  private handleContactACW(contact: ConnectContact): void {
+  private handleContactACW(_contact: ConnectContact): void {
     useAgentStore.getState().setState('AfterContactWork');
   }
 
@@ -675,8 +679,8 @@ export class ConnectService {
       type,
       state,
       queue: {
-        queueId: queue?.queueId || 'unknown',
-        name: queue?.name || 'Unknown Queue',
+        queueId: queue?.queueId ?? 'unknown',
+        name: queue?.name ?? 'Unknown Queue',
       },
       customer: {
         phoneNumber: endpoint?.phoneNumber,
@@ -702,10 +706,10 @@ export class ConnectService {
       type: connection.isInbound() ? 'inbound' : 'outbound',
       state: connection.isConnected() ? 'connected' : 'connecting',
       endpoint: {
-        type: endpoint?.type || 'phone_number',
-        phoneNumber: endpoint?.phoneNumber,
-        agentId: endpoint?.agentId,
-        queueId: endpoint?.queueId,
+        type: endpoint?.type ?? 'phone_number',
+        ...(endpoint?.phoneNumber && { phoneNumber: endpoint.phoneNumber }),
+        ...(endpoint?.agentId && { agentId: endpoint.agentId }),
+        ...(endpoint?.queueId && { queueId: endpoint.queueId }),
       },
       isOnHold: connection.isOnHold(),
       isMuted: false, // Will be updated by mute events
@@ -819,9 +823,9 @@ export class ConnectService {
         return { name: 'Available', type: 'routable' };
       case 'Unavailable':
         return { 
-          name: reason?.name || 'Unavailable', 
+          name: reason?.name ?? 'Unavailable', 
           type: 'not_routable',
-          agentStateARN: reason?.name 
+          agentStateARN: reason?.name ?? 'Unavailable'
         };
       case 'Offline':
         return { name: 'Offline', type: 'offline' };
