@@ -598,6 +598,42 @@ describe('ModuleRegistry', () => {
         })
       );
     });
+
+    it('should warn when configuration is missing during update', async () => {
+      testModule.onConfigChange = jest.fn().mockResolvedValue({
+        success: true,
+        data: undefined,
+      });
+
+      mockConfigService.get = jest.fn().mockReturnValue({
+        module_id: 'test-module' as ModuleID,
+        enabled: true,
+        position: 'main',
+        priority: 1,
+        lazy: false,
+        settings: {},
+        permissions: [],
+        dependencies: [],
+      } as ModuleConfig);
+
+      await registry.loadModule('test-module' as ModuleID);
+
+      const mockWatch = mockConfigService.watch.mock.calls[0][1];
+
+      mockConfigService.get = jest.fn().mockReturnValue(undefined);
+
+      await mockWatch({
+        key: 'modules.test-module.position',
+        newValue: 'sidebar',
+        oldValue: 'main',
+      });
+
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Configuration missing for module',
+        { moduleId: 'test-module' },
+      );
+      expect(testModule.onConfigChange).not.toHaveBeenCalled();
+    });
   });
 
   describe('cleanup and destruction', () => {
