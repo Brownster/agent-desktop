@@ -38,6 +38,7 @@
     "amazon-connect-streams": "^2.11.2",
     "socket.io-client": "^4.7.2",
     "howler": "^2.2.4",
+    "amazon-connect-rtc-js": "^1.0.0",
     "@agent-desktop/types": "workspace:*",
     "@agent-desktop/config": "workspace:*",
     "@agent-desktop/logging": "workspace:*",

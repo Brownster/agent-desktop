@@ -46,4 +46,5 @@ export type {
   BrandingConfig,
   FeatureFlags,
   IntegrationConfig,
+  AudioConfiguration,
 } from '@agent-desktop/types';

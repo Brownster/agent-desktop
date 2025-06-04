@@ -175,6 +175,11 @@ useQueueStore.getState = jest.fn().mockReturnValue(mockQueueStore);
 - **VMware Compatibility**: Support for VMware Horizon
 - **AWS WorkSpaces**: Native AWS WorkSpaces optimization
 
+##### Audio Configuration
+- **Local**: Standard browser WebRTC audio path
+- **Mobile Browser**: Optimized for mobile device constraints
+- **VDI**: Uses amazon-connect-rtc-js for media offload
+
 #### Integration Example
 ```typescript
 import { ConnectService } from '@/services/connect.service';
