@@ -60,7 +60,7 @@ export class Logger {
   private level: LogLevel;
   private correlationContext: CorrelationContext = {};
   private readonly buffer: LogEntry[] = [];
-  private flushTimer?: NodeJS.Timeout;
+  private flushTimer: NodeJS.Timeout | undefined;
   private isDestroyed = false;
 
   /**
@@ -405,11 +405,17 @@ export class Logger {
       level,
       message,
       context: this.config.context,
-      metadata,
+      ...(metadata ? { metadata } : {}),
       ...this.correlationContext,
       traceId: this.generateTraceId(),
       spanId: this.generateSpanId(),
-      performance: this.config.enablePerformanceTracking ? this.getPerformanceMetrics() : undefined,
+      ...(() => {
+        if (!this.config.enablePerformanceTracking) {
+          return {};
+        }
+        const metrics = this.getPerformanceMetrics();
+        return metrics ? { performance: metrics } : {};
+      })(),
     };
 
     // Add to buffer
@@ -480,9 +486,8 @@ export class Logger {
     return {
       name: error.name,
       message: error.message,
-      stack: error.stack,
-      // Handle additional error properties
-      ...(error.cause && { cause: this.extractErrorInfo(error.cause as Error) }),
+      ...(error.stack ? { stack: error.stack } : {}),
+      ...(error.cause ? { cause: this.extractErrorInfo(error.cause as Error) } : {}),
     };
   }
 
@@ -497,9 +502,9 @@ export class Logger {
     }
 
     try {
-      return {
-        memory: this.config.enableMemoryTracking ? process.memoryUsage() : undefined,
-      };
+      return this.config.enableMemoryTracking
+        ? { memory: process.memoryUsage() }
+        : {};
     } catch {
       return undefined;
     }

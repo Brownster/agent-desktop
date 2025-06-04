@@ -2,6 +2,8 @@
  * @fileoverview Test setup for logging library
  */
 
+import { jest, beforeEach } from '@jest/globals';
+
 // Mock performance.now for consistent timing in tests
 const mockPerformanceNow = jest.fn(() => Date.now());
 Object.defineProperty(global, 'performance', {
