@@ -8,19 +8,140 @@ import { useContactStore, type Contact, type ContactConnection, type ContactType
 import { useQueueStore } from '@/store/queue.store';
 import type { Logger } from '@agent-desktop/logging';
 
-// Amazon Connect Streams types (simplified)
+/**
+ * View contact event interface
+ */
+interface ViewContactEvent {
+  contactId: string;
+  contactData?: {
+    attributes?: Record<string, string>;
+    customerEndpoint?: {
+      type: string;
+      phoneNumber?: string;
+    };
+  };
+}
+
+/**
+ * Agent configuration interface
+ */
+interface AgentConfiguration {
+  username: string;
+  agentStates: ConnectAgentState[];
+  permissions: string[];
+  routingProfile: {
+    routingProfileId: string;
+    name: string;
+    queues: Array<{
+      queueId: string;
+      name: string;
+    }>;
+  };
+}
+
+/**
+ * Agent state change event interface
+ */
+interface AgentStateChangeEvent {
+  agent: ConnectAgent;
+  oldState: ConnectAgentState;
+  newState: ConnectAgentState;
+}
+
+/**
+ * Routing profile change event interface
+ */
+interface RoutingProfileChangeEvent {
+  agent: ConnectAgent;
+  oldRoutingProfile: {
+    routingProfileId: string;
+    name: string;
+  };
+  newRoutingProfile: {
+    routingProfileId: string;
+    name: string;
+  };
+}
+
+/**
+ * Mute toggle event interface
+ */
+interface MuteToggleEvent {
+  muted: boolean;
+  connection?: ConnectConnection;
+}
+
+/**
+ * Connect endpoint interface
+ */
+interface ConnectEndpoint {
+  type: 'phone_number' | 'agent' | 'queue';
+  phoneNumber?: string;
+  agentId?: string;
+  queueId?: string;
+  endpointId?: string;
+}
+
+/**
+ * Connect contact status interface
+ */
+interface ConnectContactStatus {
+  type: 'incoming' | 'connecting' | 'connected' | 'hold' | 'ended';
+  timestamp: Date;
+}
+
+/**
+ * Connect queue interface
+ */
+interface ConnectQueue {
+  queueId: string;
+  name: string;
+  queueARN?: string;
+}
+
+/**
+ * Connect connection state interface
+ */
+interface ConnectConnectionState {
+  type: 'init' | 'connecting' | 'connected' | 'hold' | 'disconnected';
+  timestamp: Date;
+}
+
+/**
+ * Audio device manager interface
+ */
+interface AudioDeviceManager {
+  setDevices(devices: {
+    speaker?: string;
+    microphone?: string;
+  }): void;
+  getDevices(): {
+    speaker: string;
+    microphone: string;
+  };
+  getMicrophoneDevices(): Array<{
+    deviceId: string;
+    label: string;
+  }>;
+  getSpeakerDevices(): Array<{
+    deviceId: string;
+    label: string;
+  }>;
+}
+
+// Amazon Connect Streams types
 declare global {
   interface Window {
     connect: {
       core: {
         initCCP: (container: HTMLElement, config: CCPInitConfig) => void;
         onInitialized: (callback: () => void) => void;
-        onViewContact: (callback: (event: any) => void) => void;
+        onViewContact: (callback: (event: ViewContactEvent) => void) => void;
         terminate: () => void;
       };
       agent: (callback: (agent: ConnectAgent) => void) => void;
       contact: (callback: (contact: ConnectContact) => void) => void;
-      AudioDeviceManager: any;
+      AudioDeviceManager: AudioDeviceManager;
     };
   }
 }
@@ -60,21 +181,28 @@ interface ConnectAgent {
   getState(): ConnectAgentState;
   getStateDuration(): number;
   getPermissions(): string[];
-  getConfiguration(): any;
+  getConfiguration(): AgentConfiguration;
   getAgentStates(): ConnectAgentState[];
-  getRoutingProfile(): any;
+  getRoutingProfile(): {
+    routingProfileId: string;
+    name: string;
+    queues: Array<{
+      queueId: string;
+      name: string;
+    }>;
+  };
   getName(): string;
   getExtension(): string;
   isSoftphoneEnabled(): boolean;
-  setState(state: ConnectAgentState, options?: any): void;
-  connect(endpoint: any, options?: any): void;
-  onStateChange(callback: (agentStateChange: any) => void): void;
-  onRoutingProfileChange(callback: (routingProfileChange: any) => void): void;
+  setState(state: ConnectAgentState, options?: { enqueueNext?: boolean }): void;
+  connect(endpoint: ConnectEndpoint, options?: { queueARN?: string }): void;
+  onStateChange(callback: (agentStateChange: AgentStateChangeEvent) => void): void;
+  onRoutingProfileChange(callback: (routingProfileChange: RoutingProfileChangeEvent) => void): void;
   onContactPending(callback: (agent: ConnectAgent) => void): void;
   onOffline(callback: (agent: ConnectAgent) => void): void;
-  onError(callback: (agent: ConnectAgent) => void): void;
+  onError(callback: (error: Error) => void): void;
   onAfterContactWork(callback: (agent: ConnectAgent) => void): void;
-  onMuteToggle(callback: (obj: any) => void): void;
+  onMuteToggle(callback: (event: MuteToggleEvent) => void): void;
 }
 
 /**
@@ -92,24 +220,24 @@ interface ConnectAgentState {
 interface ConnectContact {
   getContactId(): string;
   getOriginalContactId(): string;
-  getType(): string;
-  getStatus(): any;
+  getType(): 'voice' | 'chat' | 'task';
+  getStatus(): ConnectContactStatus;
   getStatusDuration(): number;
-  getQueue(): any;
+  getQueue(): ConnectQueue;
   getQueueTimestamp(): Date;
   getConnections(): ConnectConnection[];
   getInitialConnection(): ConnectConnection;
   getActiveInitialConnection(): ConnectConnection;
   getThirdPartyConnections(): ConnectConnection[];
   getSingleActiveThirdPartyConnection(): ConnectConnection;
-  getAttributes(): { [key: string]: any };
+  getAttributes(): Record<string, string | number | boolean>;
   isSoftphoneCall(): boolean;
   isInbound(): boolean;
   isConnected(): boolean;
   accept(): void;
   destroy(): void;
   notifyIssue(issueCode: string, description: string, endpointARN: string): void;
-  addConnection(endpoint: any): void;
+  addConnection(endpoint: ConnectEndpoint): void;
   toggleActiveConnections(): void;
   conferenceConnections(): void;
   onRefresh(callback: (contact: ConnectContact) => void): void;
@@ -129,10 +257,10 @@ interface ConnectContact {
  */
 interface ConnectConnection {
   getConnectionId(): string;
-  getEndpoint(): any;
-  getState(): any;
+  getEndpoint(): ConnectEndpoint;
+  getState(): ConnectConnectionState;
   getStateDuration(): number;
-  getType(): string;
+  getType(): 'inbound' | 'outbound' | 'monitoring';
   isInitialConnection(): boolean;
   isInbound(): boolean;
   isConnected(): boolean;
@@ -156,7 +284,7 @@ interface ConnectConnection {
  */
 export class ConnectService {
   private logger: Logger;
-  private isInitialized = false;
+  private initialized = false;
   private ccpContainer: HTMLElement | null = null;
   private agent: ConnectAgent | null = null;
   private activeContacts = new Map<string, ConnectContact>();
@@ -180,7 +308,7 @@ export class ConnectService {
       // Set up initialization callback
       window.connect.core.onInitialized(() => {
         this.logger.info('Amazon Connect CCP initialized successfully');
-        this.isInitialized = true;
+        this.initialized = true;
         this.setupEventListeners();
         useAgentStore.getState().setInitialized(true);
       });
@@ -210,8 +338,11 @@ export class ConnectService {
     this.logger.debug('Setting up Amazon Connect event listeners');
 
     // Handle view contact events for screen pop
-    window.connect.core.onViewContact((event: any) => {
-      this.logger.debug('View contact event received', { event });
+    window.connect.core.onViewContact((event: ViewContactEvent) => {
+      this.logger.debug('View contact event received', { 
+        contactId: event.contactId,
+        attributes: event.contactData?.attributes 
+      });
       // Handle screen pop logic here
     });
   }
@@ -227,14 +358,20 @@ export class ConnectService {
     this.updateAgentState(agent);
 
     // Agent state changes
-    agent.onStateChange((stateChange: any) => {
-      this.logger.debug('Agent state changed', { stateChange });
+    agent.onStateChange((stateChange: AgentStateChangeEvent) => {
+      this.logger.debug('Agent state changed', { 
+        oldState: stateChange.oldState.name,
+        newState: stateChange.newState.name 
+      });
       this.updateAgentState(agent);
     });
 
     // Routing profile changes
-    agent.onRoutingProfileChange((profileChange: any) => {
-      this.logger.debug('Agent routing profile changed', { profileChange });
+    agent.onRoutingProfileChange((profileChange: RoutingProfileChangeEvent) => {
+      this.logger.debug('Agent routing profile changed', { 
+        oldProfile: profileChange.oldRoutingProfile.name,
+        newProfile: profileChange.newRoutingProfile.name 
+      });
       this.updateAgentInfo(agent);
     });
 
@@ -245,16 +382,22 @@ export class ConnectService {
     });
 
     // Agent errors
-    agent.onError((error: any) => {
-      this.logger.error('Agent error occurred', { error });
+    agent.onError((error: Error) => {
+      this.logger.error('Agent error occurred', { 
+        message: error.message,
+        stack: error.stack 
+      });
       useAgentStore.getState().setConnectionStatus(false, 'Agent error');
     });
 
     // Mute toggle
-    agent.onMuteToggle((obj: any) => {
-      this.logger.debug('Agent mute toggled', { obj });
+    agent.onMuteToggle((event: MuteToggleEvent) => {
+      this.logger.debug('Agent mute toggled', { 
+        muted: event.muted,
+        connectionId: event.connection?.getConnectionId() 
+      });
       // Update mute state in active contacts
-      this.updateActiveMuteState(obj.muted);
+      this.updateActiveMuteState(event.muted);
     });
   }
 
@@ -691,7 +834,7 @@ export class ConnectService {
    * Get initialization status
    */
   isInitialized(): boolean {
-    return this.isInitialized;
+    return this.initialized;
   }
 
   /**
@@ -705,7 +848,7 @@ export class ConnectService {
         window.connect.core.terminate();
       }
       
-      this.isInitialized = false;
+      this.initialized = false;
       this.agent = null;
       this.activeContacts.clear();
       
