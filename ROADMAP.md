@@ -460,5 +460,5 @@ Build the most advanced, user-friendly, and VDI-optimized contact center agent d
 
 ---
 
-*Last Updated: January 2024*
-*Next Review: April 2024*
+*Last Updated: April 2024*
+*Next Review: July 2024*

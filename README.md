@@ -42,6 +42,7 @@ agent-desktop/
 │   └── ccp-docs/           # Developer documentation
 ├── libs/
 │   ├── core/               # Business logic & module system
+│   ├── customer-info/      # Contact info module implementation
 │   ├── ui-components/      # Shared UI components
 │   ├── config/             # Configuration management
 │   ├── logging/            # Enterprise logging
@@ -122,6 +123,7 @@ The main contact center application with full Amazon Connect integration.
 - Priority flags and escalation indicators
 - Queue information and wait times
 - Real-time duration tracking
+- Available as a standalone module via `@agent-desktop/customer-info`
 
 #### 📞 DTMF Dialpad (`Dialpad.tsx`)
 - Interactive dialpad with audio tone generation
