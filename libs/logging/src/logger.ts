@@ -57,6 +57,7 @@ const DEFAULT_CONFIG: LoggerConfig = {
  */
 export class Logger {
   private readonly config: LoggerConfig;
+  private level: LogLevel;
   private correlationContext: CorrelationContext = {};
   private readonly buffer: LogEntry[] = [];
   private flushTimer?: NodeJS.Timeout;
@@ -69,6 +70,7 @@ export class Logger {
    */
   constructor(config: Partial<LoggerConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
+    this.level = this.config.level;
     this.startAutoFlush();
   }
 
@@ -113,6 +115,24 @@ export class Logger {
    */
   getContext(): CorrelationContext {
     return { ...this.correlationContext };
+  }
+
+  /**
+   * Set log level at runtime
+   *
+   * @param level - New log level
+   */
+  setLevel(level: LogLevel): void {
+    this.level = level;
+  }
+
+  /**
+   * Get current log level
+   *
+   * @returns Current log level
+   */
+  getLevel(): LogLevel {
+    return this.level;
   }
 
   /**
@@ -376,7 +396,7 @@ export class Logger {
    * @param metadata - Additional structured data
    */
   private log(level: LogLevel, message: string, metadata?: Record<string, unknown>): void {
-    if (this.isDestroyed || level < this.config.level) {
+    if (this.isDestroyed || level < this.level) {
       return;
     }
 

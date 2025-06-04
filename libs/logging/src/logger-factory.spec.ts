@@ -247,16 +247,28 @@ describe('LoggerFactory', () => {
   });
 
   describe('global level changes', () => {
-    it('should warn about unimplemented feature', () => {
-      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
-      
+    it('should update existing and future loggers', async () => {
+      const transport = global.LoggingTestUtils.createMockTransport();
+      factory.addTransport(transport);
+
+      const logger = factory.createLogger('test-context');
+
       factory.setGlobalLevel(LogLevel.ERROR);
-      
-      expect(warnSpy).toHaveBeenCalledWith(
-        'Dynamic log level changes not yet implemented'
-      );
-      
-      warnSpy.mockRestore();
+
+      logger.info('skip');
+      logger.error('log');
+      await logger.flush();
+
+      expect(transport.write).toHaveBeenCalledTimes(1);
+
+      const newLogger = factory.createLogger('new-context');
+      newLogger.warn('skip');
+      newLogger.error('another');
+      await newLogger.flush();
+
+      expect(transport.write).toHaveBeenCalledTimes(2);
+      const entry = transport.write.mock.calls[1][0];
+      expect(entry.level).toBe(LogLevel.ERROR);
     });
   });
 });
