@@ -78,6 +78,7 @@ export interface ConfigServiceOptions {
     readonly url?: string;
     readonly reconnectInterval?: number;
     readonly maxReconnectAttempts?: number;
+    readonly maxQueueSize?: number;
   };
   readonly storeType: 'memory' | 'dynamodb';
   readonly dynamoTableName?: string;
