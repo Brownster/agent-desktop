@@ -9,6 +9,7 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as s3 from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
 
 /**
@@ -24,6 +25,8 @@ import { Construct } from 'constructs';
 export class ConfigApiStack extends cdk.Stack {
   public readonly configTable: dynamodb.Table;
   public readonly configApiFunction: lambda.Function;
+  public readonly assetsBucket: s3.Bucket;
+  public readonly assetsFunction: lambda.Function;
   public readonly api: apigateway.RestApi;
 
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -72,6 +75,21 @@ export class ConfigApiStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    // Bucket for uploaded assets
+    const assetsBucket = new s3.Bucket(this, 'AssetsBucket', {
+      bucketName: `ccp-assets-${this.account}`,
+      versioned: true,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      cors: [
+        {
+          allowedMethods: [s3.HttpMethods.PUT, s3.HttpMethods.POST],
+          allowedOrigins: ['*'],
+          allowedHeaders: ['*'],
+        },
+      ],
+    });
+
     // Create Lambda function for Configuration API
     this.configApiFunction = new lambda.Function(this, 'ConfigApiFunction', {
       functionName: 'ccp-config-api',
@@ -95,6 +113,26 @@ export class ConfigApiStack extends cdk.Stack {
         Purpose: 'configuration-management',
       },
     });
+
+    // Lambda for asset uploads
+    const assetsFunction = new lambda.Function(this, 'AssetsApiFunction', {
+      functionName: 'ccp-assets-api',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('../lambda/assets-api'),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: {
+        AWS_REGION: this.region,
+        ASSETS_BUCKET_NAME: assetsBucket.bucketName,
+      },
+      description: 'Asset upload API',
+    });
+
+    assetsBucket.grantPut(assetsFunction);
+
+    this.assetsBucket = assetsBucket;
+    this.assetsFunction = assetsFunction;
 
     // Grant Lambda permissions to read/write from DynamoDB table
     this.configTable.grantReadWriteData(this.configApiFunction);
@@ -149,6 +187,10 @@ export class ConfigApiStack extends cdk.Stack {
       proxy: true,
     });
 
+    const assetsIntegration = new apigateway.LambdaIntegration(assetsFunction, {
+      proxy: true,
+    });
+
     // Health check endpoint
     const healthResource = this.api.root.addResource('health');
     healthResource.addMethod('GET', lambdaIntegration, {
@@ -166,6 +208,13 @@ export class ConfigApiStack extends cdk.Stack {
           },
         },
       ],
+    });
+
+    // Asset upload endpoint
+    const assetsResource = this.api.root.addResource('assets');
+    const uploadResource = assetsResource.addResource('upload');
+    uploadResource.addMethod('POST', assetsIntegration, {
+      methodResponses: [{ statusCode: '200' }],
     });
 
     // Customer configurations endpoints
@@ -416,6 +465,12 @@ export class ConfigApiStack extends cdk.Stack {
       value: this.api.deploymentStage.stageName,
       description: 'Configuration API deployment stage',
       exportName: `${this.stackName}-ConfigApiStage`,
+    });
+
+    new cdk.CfnOutput(this, 'AssetsBucketName', {
+      value: assetsBucket.bucketName,
+      description: 'S3 bucket for uploaded assets',
+      exportName: `${this.stackName}-AssetsBucketName`,
     });
   }
 }
