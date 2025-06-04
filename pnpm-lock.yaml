@@ -39,6 +39,9 @@ importers:
       '@nx/eslint':
         specifier: ^17.3.0
         version: 17.3.2(@types/node@20.17.57)(nx@17.3.2)
+      '@nx/eslint-plugin':
+        specifier: ^17.3.0
+        version: 17.3.2(@types/node@20.17.57)(@typescript-eslint/parser@6.21.0)(eslint@8.57.1)(nx@17.3.2)(typescript@5.8.3)
       '@nx/jest':
         specifier: ^17.3.0
         version: 17.3.2(@types/node@20.17.57)(nx@17.3.2)(typescript@5.8.3)
@@ -3173,6 +3176,26 @@ packages:
       - nx
     dev: true
 
+  /@nrwl/eslint-plugin-nx@17.3.2(@types/node@20.17.57)(@typescript-eslint/parser@6.21.0)(eslint@8.57.1)(nx@17.3.2)(typescript@5.8.3):
+    resolution: {integrity: sha512-KfZtT+breRD7D8dy+YLIdKD7S9t4aqtEQLpRQCnJrCALYdqIRuql9rC2J69RUosozgrk55C0LERF0/kJVPe6Gg==}
+    dependencies:
+      '@nx/eslint-plugin': 17.3.2(@types/node@20.17.57)(@typescript-eslint/parser@6.21.0)(eslint@8.57.1)(nx@17.3.2)(typescript@5.8.3)
+    transitivePeerDependencies:
+      - '@babel/traverse'
+      - '@swc-node/register'
+      - '@swc/core'
+      - '@swc/wasm'
+      - '@types/node'
+      - '@typescript-eslint/parser'
+      - debug
+      - eslint
+      - eslint-config-prettier
+      - nx
+      - supports-color
+      - typescript
+      - verdaccio
+    dev: true
+
   /@nrwl/jest@17.3.2(@types/node@20.17.57)(nx@17.3.2)(typescript@5.8.3):
     resolution: {integrity: sha512-sL7POaqrzHUBqKMOigmGsDin9hFtzL6orzSev0qOoTPCegRvMfyPpTbYdUsyN186jj0/ReD0b9lAiSOpfq3Q1g==}
     dependencies:
@@ -3348,6 +3371,40 @@ packages:
       tmp: 0.2.3
       tslib: 2.8.1
       yargs-parser: 21.1.1
+    dev: true
+
+  /@nx/eslint-plugin@17.3.2(@types/node@20.17.57)(@typescript-eslint/parser@6.21.0)(eslint@8.57.1)(nx@17.3.2)(typescript@5.8.3):
+    resolution: {integrity: sha512-szNXnMr54SH3uQjsTgSb/ySomhbqF0nJnca1yoC7XJG8+jlQLTs8EiyqjdQ9CVo+KTxsb9ilDtAZXRNCHEyGlw==}
+    peerDependencies:
+      '@typescript-eslint/parser': ^6.13.2
+      eslint-config-prettier: ^9.0.0
+    peerDependenciesMeta:
+      eslint-config-prettier:
+        optional: true
+    dependencies:
+      '@nrwl/eslint-plugin-nx': 17.3.2(@types/node@20.17.57)(@typescript-eslint/parser@6.21.0)(eslint@8.57.1)(nx@17.3.2)(typescript@5.8.3)
+      '@nx/devkit': 17.3.2(nx@17.3.2)
+      '@nx/js': 17.3.2(@types/node@20.17.57)(nx@17.3.2)(typescript@5.8.3)
+      '@typescript-eslint/parser': 6.21.0(eslint@8.57.1)(typescript@5.8.3)
+      '@typescript-eslint/type-utils': 6.21.0(eslint@8.57.1)(typescript@5.8.3)
+      '@typescript-eslint/utils': 6.21.0(eslint@8.57.1)(typescript@5.8.3)
+      chalk: 4.1.2
+      confusing-browser-globals: 1.0.11
+      jsonc-eslint-parser: 2.4.0
+      semver: 7.7.2
+      tslib: 2.8.1
+    transitivePeerDependencies:
+      - '@babel/traverse'
+      - '@swc-node/register'
+      - '@swc/core'
+      - '@swc/wasm'
+      - '@types/node'
+      - debug
+      - eslint
+      - nx
+      - supports-color
+      - typescript
+      - verdaccio
     dev: true
 
   /@nx/eslint@17.3.2(@types/node@20.17.57)(nx@17.3.2):
@@ -6121,6 +6178,10 @@ packages:
     resolution: {integrity: sha512-RMtmw0iFkeR4YV+fUOSucriAQNb9g8zFR52MWCtl+cCZOFRNL6zeB395vPzFhEjjn4fMxXudmELnl/KF/WrK6w==}
     dev: true
 
+  /confusing-browser-globals@1.0.11:
+    resolution: {integrity: sha512-JsPKdmh8ZkmnHxDk55FZ1TqVLvEQTvoByJZRN9jzI0UjxK/QgAmsphz7PGtqgPieQZ/CQcHWXCR7ATDNhGe+YA==}
+    dev: true
+
   /convert-source-map@2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
     dev: true
@@ -8646,6 +8707,16 @@ packages:
     resolution: {integrity: sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg==}
     engines: {node: '>=6'}
     hasBin: true
+    dev: true
+
+  /jsonc-eslint-parser@2.4.0:
+    resolution: {integrity: sha512-WYDyuc/uFcGp6YtM2H0uKmUwieOuzeE/5YocFJLnLfclZ4inf3mRn8ZVy1s7Hxji7Jxm6Ss8gqpexD/GlKoGgg==}
+    engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
+    dependencies:
+      acorn: 8.14.1
+      eslint-visitor-keys: 3.4.3
+      espree: 9.6.1
+      semver: 7.7.2
     dev: true
 
   /jsonc-parser@3.2.0:

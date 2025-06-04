@@ -34,6 +34,7 @@
   "devDependencies": {
     "@nx/cypress": "^17.3.0",
     "@nx/eslint": "^17.3.0",
+    "@nx/eslint-plugin": "^17.3.0",
     "@nx/jest": "^17.3.0",
     "@nx/js": "^17.3.0",
     "@nx/react": "^17.3.0",
