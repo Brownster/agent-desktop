@@ -15,7 +15,7 @@ describe('ConfigWebSocketService queue', () => {
   });
 
   it('should drop oldest messages when queue limit is reached', () => {
-    const service: any = new ConfigWebSocketService({ maxQueueSize: 2 }, mockLogger as any);
+    const service = new ConfigWebSocketService({ maxQueueSize: 2 }, mockLogger as any);
 
     const createEvent = (key: string): ConfigChangeEvent => ({
       key,
@@ -30,7 +30,7 @@ describe('ConfigWebSocketService queue', () => {
     service.notifyConfigChange('cust', createEvent('k3'));
     service.notifyConfigChange('cust', createEvent('k4'));
 
-    const queue = service.messageQueue as any[];
+    const queue = service.getQueue();
     const keys = queue.map(m => (m.payload as any).change.key);
     expect(queue.length).toBe(2);
     expect(keys).toEqual(['k3', 'k4']);

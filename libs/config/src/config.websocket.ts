@@ -219,8 +219,10 @@ export class ConfigWebSocketService {
     }
 
     // Send subscription message
-    const payload: SubscriptionMessage =
-      pattern !== undefined ? { customerId, pattern } : { customerId };
+    const payload: SubscriptionMessage = pattern
+      ? { customerId, pattern }
+      : { customerId };
+
     const message: WebSocketMessage = {
       type: WebSocketMessageType.CONFIG_SUBSCRIBED,
       payload,
@@ -258,8 +260,10 @@ export class ConfigWebSocketService {
     }
 
     // Send unsubscription message
-    const payload: SubscriptionMessage =
-      pattern !== undefined ? { customerId, pattern } : { customerId };
+    const payload: SubscriptionMessage = pattern
+      ? { customerId, pattern }
+      : { customerId };
+
     const message: WebSocketMessage = {
       type: WebSocketMessageType.CONFIG_UNSUBSCRIBED,
       payload,
@@ -294,6 +298,13 @@ export class ConfigWebSocketService {
    */
   isConnectionOpen(): boolean {
     return this.isConnected && this.ws?.readyState === WebSocket.OPEN;
+  }
+
+  /**
+   * Get queued messages
+   */
+  getQueue(): WebSocketMessage[] {
+    return [...this.messageQueue];
   }
 
   /**
