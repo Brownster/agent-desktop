@@ -642,22 +642,36 @@ export class ConfigValidator {
    */
   private validateBusinessRules(
     config: Record<string, unknown>,
-    errors: ConfigValidationError[],
-    warnings: ConfigValidationWarning[]
+    errors: ConfigValidationError[] | readonly ConfigValidationError[],
+    warnings: ConfigValidationWarning[] | readonly ConfigValidationWarning[]
   ): void {
+    const mutableErrors = errors as ConfigValidationError[];
+    const mutableWarnings = warnings as ConfigValidationWarning[];
     // Validate module dependencies
     if (config.modules && Array.isArray(config.modules)) {
-      this.validateModuleDependencies(config.modules, errors, warnings);
+      this.validateModuleDependencies(
+        config.modules,
+        mutableErrors,
+        mutableWarnings
+      );
     }
 
     // Validate integration consistency
     if (config.integrations && Array.isArray(config.integrations)) {
-      this.validateIntegrations(config.integrations, errors, warnings);
+      this.validateIntegrations(
+        config.integrations,
+        mutableErrors,
+        mutableWarnings
+      );
     }
 
     // Validate deployment consistency
     if (config.deployment && typeof config.deployment === 'object') {
-      this.validateDeployment(config.deployment as Record<string, unknown>, errors, warnings);
+      this.validateDeployment(
+        config.deployment as Record<string, unknown>,
+        mutableErrors,
+        mutableWarnings
+      );
     }
   }
 
@@ -665,10 +679,13 @@ export class ConfigValidator {
    * Validate module dependencies
    */
   private validateModuleDependencies(
-    modules: unknown[],
-    errors: ConfigValidationError[],
-    warnings: ConfigValidationWarning[]
+    modules: readonly unknown[],
+    errors: ConfigValidationError[] | readonly ConfigValidationError[],
+    warnings: ConfigValidationWarning[] | readonly ConfigValidationWarning[]
   ): void {
+    const mutableErrors = errors as ConfigValidationError[];
+    const mutableWarnings = warnings as ConfigValidationWarning[];
+
     const moduleIds = new Set<string>();
     const moduleMap = new Map<string, unknown>();
 
@@ -680,7 +697,7 @@ export class ConfigValidator {
 
         if (moduleId) {
           if (moduleIds.has(moduleId)) {
-            errors.push({
+            mutableErrors.push({
               field: `modules[${index}].module_id`,
               message: `Duplicate module ID: ${moduleId}`,
               code: 'DUPLICATE_MODULE_ID',
@@ -703,7 +720,7 @@ export class ConfigValidator {
         if (Array.isArray(dependencies)) {
           dependencies.forEach((dep, depIndex) => {
             if (!moduleIds.has(dep)) {
-              errors.push({
+              mutableErrors.push({
                 field: `modules[${index}].dependencies[${depIndex}]`,
                 message: `Module dependency '${dep}' not found`,
                 code: 'MISSING_MODULE_DEPENDENCY',
@@ -720,10 +737,13 @@ export class ConfigValidator {
    * Validate integrations
    */
   private validateIntegrations(
-    integrations: unknown[],
-    errors: ConfigValidationError[],
-    warnings: ConfigValidationWarning[]
+    integrations: readonly unknown[],
+    errors: ConfigValidationError[] | readonly ConfigValidationError[],
+    warnings: ConfigValidationWarning[] | readonly ConfigValidationWarning[]
   ): void {
+    const mutableErrors = errors as ConfigValidationError[];
+    const mutableWarnings = warnings as ConfigValidationWarning[];
+
     const integrationNames = new Set<string>();
 
     integrations.forEach((integration, index) => {
@@ -733,7 +753,7 @@ export class ConfigValidator {
 
         if (name) {
           if (integrationNames.has(name)) {
-            errors.push({
+            mutableErrors.push({
               field: `integrations[${index}].name`,
               message: `Duplicate integration name: ${name}`,
               code: 'DUPLICATE_INTEGRATION_NAME',
