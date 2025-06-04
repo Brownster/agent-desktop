@@ -11,7 +11,7 @@ import {
   XCircleIcon,
   ChevronRightIcon,
 } from '@heroicons/react/24/outline';
-import { Switch } from '@headlessui/react';
+import { Dialog, Switch } from '@headlessui/react';
 
 /**
  * Module interface
@@ -383,6 +383,30 @@ function StarRating({ rating }: { rating: number }): React.ReactElement {
   );
 }
 
+function ModuleConfigModal({ module, onClose }: { module: Module | null; onClose: () => void }): React.ReactElement | null {
+  if (!module) return null;
+  return (
+    <Dialog open={!!module} onClose={onClose} className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/30" aria-hidden="true" />
+      <Dialog.Panel className="relative bg-white rounded-md shadow-lg max-w-md w-full p-6">
+        <Dialog.Title className="text-lg font-medium">Configure {module.name}</Dialog.Title>
+        <div className="mt-4 space-y-1 text-sm">
+          {Object.entries(module.configuration || {}).map(([key, value]) => (
+            <div key={key} className="flex justify-between">
+              <span className="text-gray-600">{key}</span>
+              <span className="font-mono text-gray-900">{String(value)}</span>
+            </div>
+          ))}
+        </div>
+        <div className="mt-6 flex justify-end space-x-2">
+          <button onClick={onClose} className="btn-secondary">Close</button>
+          <button onClick={onClose} className="btn-primary">Save</button>
+        </div>
+      </Dialog.Panel>
+    </Dialog>
+  );
+}
+
 /**
  * Modules page component
  */
@@ -390,9 +414,17 @@ function Modules(): React.ReactElement {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<Module['category'] | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<Module['status'] | 'all'>('all');
+  const [viewMode, setViewMode] = useState<ViewMode>('installed');
+  const [moduleList, setModuleList] = useState<Module[]>(modules);
+  const [configModule, setConfigModule] = useState<Module | null>(null);
+  const enabledCount = moduleList.filter(m => m.enabled).length;
+  const installedCount = moduleList.filter(m => m.installed).length;
+  const loadOrder = calculateLoadOrder(
+    moduleList.filter(m => m.enabled).map(m => m.id)
+  );
 
   // Filter modules based on search, category, and status
-  const filteredModules = modules.filter((module) => {
+  const filteredModules = moduleList.filter((module) => {
     const matchesSearch = module.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          module.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          module.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -402,6 +434,10 @@ function Modules(): React.ReactElement {
     
     return matchesSearch && matchesCategory && matchesStatus;
   });
+
+  const displayModules = filteredModules.filter(m =>
+    viewMode === 'installed' ? m.installed : true
+  );
 
   return (
     <div className="space-y-6">
@@ -418,6 +454,33 @@ function Modules(): React.ReactElement {
           Create Module
         </button>
       </div>
+
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-4" aria-label="Tabs">
+          <button
+            className={`px-3 py-2 text-sm font-medium border-b-2 ${
+              viewMode === 'catalog' ? 'border-connect-600 text-connect-600' : 'border-transparent text-gray-500'
+            }`}
+            onClick={() => setViewMode('catalog')}
+          >
+            Catalog
+          </button>
+          <button
+            className={`px-3 py-2 text-sm font-medium border-b-2 ${
+              viewMode === 'installed' ? 'border-connect-600 text-connect-600' : 'border-transparent text-gray-500'
+            }`}
+            onClick={() => setViewMode('installed')}
+          >
+            Installed ({installedCount})
+          </button>
+        </nav>
+      </div>
+
+      <p className="text-sm text-gray-600 mt-4">
+        {viewMode === 'catalog'
+          ? 'Browse and install available modules'
+          : 'Manage installed modules and their configurations'}
+      </p>
 
       {/* Filters */}
       <div className="card p-6">
@@ -474,18 +537,19 @@ function Modules(): React.ReactElement {
       {/* Results summary */}
       <div className="flex justify-between items-center text-sm text-gray-600">
         <span>
-          Showing {filteredModules.length} of {modules.length} modules
+          Showing {filteredModules.length} of {moduleList.length} modules
         </span>
         <span>
-          {modules.filter(m => m.status === 'available').length} available, {' '}
-          {modules.filter(m => m.status === 'beta').length} beta, {' '}
-          {modules.filter(m => m.status === 'coming-soon').length} coming soon
+          {moduleList.filter(m => m.status === 'available').length} available,{' '}
+          {moduleList.filter(m => m.status === 'beta').length} beta,{' '}
+          {moduleList.filter(m => m.status === 'coming-soon').length} coming soon
         </span>
+        <span>{enabledCount} enabled, {installedCount} installed</span>
       </div>
 
       {/* Modules grid */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
-        {filteredModules.map((module) => (
+        {displayModules.map((module) => (
           <div key={module.id} className="card-hover">
             {/* Module header */}
             <div className="p-6 border-b border-gray-200">
@@ -558,16 +622,30 @@ function Modules(): React.ReactElement {
             {/* Module actions */}
             <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <button className="p-2 text-gray-400 hover:text-connect-600 hover:bg-white rounded">
-                  <EyeIcon className="h-4 w-4" />
-                </button>
-                <button className="p-2 text-gray-400 hover:text-connect-600 hover:bg-white rounded">
-                  <DocumentTextIcon className="h-4 w-4" />
-                </button>
-                <button className="p-2 text-gray-400 hover:text-connect-600 hover:bg-white rounded">
-                  <CodeBracketIcon className="h-4 w-4" />
-                </button>
-                <button className="p-2 text-gray-400 hover:text-connect-600 hover:bg-white rounded">
+                <Switch
+                  checked={module.enabled}
+                  onChange={() =>
+                    setModuleList(prev =>
+                      prev.map(m =>
+                        m.id === module.id ? { ...m, enabled: !m.enabled } : m
+                      )
+                    )
+                  }
+                  className={`${
+                    module.enabled ? 'bg-connect-600' : 'bg-gray-300'
+                  } relative inline-flex h-6 w-11 items-center rounded-full`}
+                >
+                  <span className="sr-only">Enable module</span>
+                  <span
+                    className={`${
+                      module.enabled ? 'translate-x-6' : 'translate-x-1'
+                    } inline-block h-4 w-4 transform rounded-full bg-white transition`}
+                  />
+                </Switch>
+                <button
+                  className="p-2 text-gray-400 hover:text-connect-600 hover:bg-white rounded"
+                  onClick={() => setConfigModule(module)}
+                >
                   <Cog6ToothIcon className="h-4 w-4" />
                 </button>
               </div>
@@ -593,7 +671,7 @@ function Modules(): React.ReactElement {
       </div>
 
       {/* Empty state */}
-      {filteredModules.length === 0 && (
+      {displayModules.length === 0 && (
         <div className="text-center py-12">
           <CubeIcon className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-2 text-sm font-medium text-gray-900">No modules found</h3>
@@ -605,6 +683,19 @@ function Modules(): React.ReactElement {
           </p>
         </div>
       )}
+
+      {/* Load order */}
+      {displayModules.length > 0 && (
+        <div className="mt-6">
+          <h3 className="text-lg font-medium text-gray-900">Module Load Order</h3>
+          <ol className="list-decimal list-inside mt-2 space-y-1">
+            {loadOrder.map(id => (
+              <li key={id}>{id}</li>
+            ))}
+          </ol>
+        </div>
+      )}
+      <ModuleConfigModal module={configModule} onClose={() => setConfigModule(null)} />
     </div>
   );
 }
