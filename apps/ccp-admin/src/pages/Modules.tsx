@@ -7,7 +7,11 @@ import {
   CodeBracketIcon,
   Cog6ToothIcon,
   CubeIcon,
+  ExclamationTriangleIcon,
+  XCircleIcon,
+  ChevronRightIcon,
 } from '@heroicons/react/24/outline';
+import { Switch } from '@headlessui/react';
 
 /**
  * Module interface
@@ -25,10 +29,32 @@ interface Module {
   downloadCount: number;
   rating: number;
   tags: string[];
+  // Configuration properties
+  enabled?: boolean;
+  installed?: boolean;
+  configuration?: Record<string, any>;
+  hasConfiguration?: boolean;
+  loadPriority?: number;
+  loadStrategy?: 'eager' | 'lazy' | 'on-demand';
 }
 
 /**
- * Mock modules data
+ * Module configuration view type
+ */
+type ViewMode = 'catalog' | 'installed' | 'configuration';
+
+/**
+ * Dependency check result
+ */
+interface DependencyCheck {
+  moduleId: string;
+  satisfied: boolean;
+  missing?: string[] | undefined;
+  conflicts?: string[] | undefined;
+}
+
+/**
+ * Mock modules data with configuration state
  */
 const modules: Module[] = [
   {
@@ -44,6 +70,16 @@ const modules: Module[] = [
     downloadCount: 1250,
     rating: 4.9,
     tags: ['core', 'essential', 'agent-controls'],
+    enabled: true,
+    installed: true,
+    hasConfiguration: true,
+    loadPriority: 1,
+    loadStrategy: 'eager',
+    configuration: {
+      maxConcurrentCalls: 3,
+      enableCallRecording: true,
+      defaultAgentState: 'available'
+    }
   },
   {
     id: 'customer-info',
@@ -58,6 +94,16 @@ const modules: Module[] = [
     downloadCount: 980,
     rating: 4.7,
     tags: ['customer-data', 'screen-pop', 'crm'],
+    enabled: true,
+    installed: true,
+    hasConfiguration: true,
+    loadPriority: 2,
+    loadStrategy: 'eager',
+    configuration: {
+      displayFormat: 'compact',
+      showContactHistory: true,
+      maxHistoryItems: 50
+    }
   },
   {
     id: 'case-management',
@@ -72,6 +118,16 @@ const modules: Module[] = [
     downloadCount: 756,
     rating: 4.5,
     tags: ['case-tracking', 'ticketing', 'workflow'],
+    enabled: false,
+    installed: true,
+    hasConfiguration: true,
+    loadPriority: 5,
+    loadStrategy: 'lazy',
+    configuration: {
+      autoCreateCase: false,
+      defaultCasePriority: 'medium',
+      requireDescription: true
+    }
   },
   {
     id: 'knowledge-base',
@@ -86,6 +142,16 @@ const modules: Module[] = [
     downloadCount: 432,
     rating: 4.3,
     tags: ['knowledge', 'search', 'articles', 'help'],
+    enabled: true,
+    installed: true,
+    hasConfiguration: true,
+    loadPriority: 4,
+    loadStrategy: 'on-demand',
+    configuration: {
+      searchResultLimit: 10,
+      enableAutoSuggest: true,
+      suggestionThreshold: 0.7
+    }
   },
   {
     id: 'salesforce-integration',
@@ -100,6 +166,16 @@ const modules: Module[] = [
     downloadCount: 654,
     rating: 4.6,
     tags: ['salesforce', 'crm', 'integration', 'sync'],
+    enabled: false,
+    installed: false,
+    hasConfiguration: true,
+    loadPriority: 6,
+    loadStrategy: 'lazy',
+    configuration: {
+      orgUrl: '',
+      apiVersion: '58.0',
+      syncInterval: 300000
+    }
   },
   {
     id: 'analytics-dashboard',
@@ -114,6 +190,16 @@ const modules: Module[] = [
     downloadCount: 342,
     rating: 4.8,
     tags: ['analytics', 'dashboard', 'metrics', 'real-time'],
+    enabled: true,
+    installed: true,
+    hasConfiguration: true,
+    loadPriority: 3,
+    loadStrategy: 'eager',
+    configuration: {
+      refreshInterval: 30000,
+      enableAlerts: true,
+      retentionDays: 30
+    }
   },
   {
     id: 'voice-analytics',
@@ -128,6 +214,16 @@ const modules: Module[] = [
     downloadCount: 123,
     rating: 4.2,
     tags: ['voice', 'ai', 'sentiment', 'beta'],
+    enabled: false,
+    installed: false,
+    hasConfiguration: true,
+    loadPriority: 7,
+    loadStrategy: 'on-demand',
+    configuration: {
+      enableSentiment: true,
+      enableKeywords: true,
+      confidenceThreshold: 0.8
+    }
   },
   {
     id: 'chat-widget',
@@ -142,8 +238,81 @@ const modules: Module[] = [
     downloadCount: 0,
     rating: 0,
     tags: ['chat', 'messaging', 'multi-channel', 'coming-soon'],
+    enabled: false,
+    installed: false,
+    hasConfiguration: true,
+    loadPriority: 8,
+    loadStrategy: 'lazy',
+    configuration: {
+      maxFileSize: 10485760,
+      enableEmoji: true,
+      typingIndicators: true
+    }
   },
 ];
+
+/**
+ * Check module dependencies
+ */
+function checkDependencies(moduleId: string, enabledModules: string[]): DependencyCheck {
+  const module = modules.find(m => m.id === moduleId);
+  if (!module) {
+    return { moduleId, satisfied: false, missing: ['Module not found'] };
+  }
+
+  const missing = module.dependencies.filter(dep => !enabledModules.includes(dep));
+  
+  return {
+    moduleId,
+    satisfied: missing.length === 0,
+    missing: missing.length > 0 ? missing : undefined
+  } as DependencyCheck;
+}
+
+/**
+ * Get modules that depend on a given module
+ */
+function getDependentModules(moduleId: string): string[] {
+  return modules
+    .filter(m => m.dependencies.includes(moduleId))
+    .map(m => m.id);
+}
+
+/**
+ * Calculate load order based on dependencies and priority
+ */
+function calculateLoadOrder(enabledModuleIds: string[]): string[] {
+  const enabledModules = modules.filter(m => enabledModuleIds.includes(m.id));
+  const sorted: string[] = [];
+  const visited = new Set<string>();
+  const visiting = new Set<string>();
+
+  function visit(moduleId: string) {
+    if (visiting.has(moduleId)) {
+      throw new Error(`Circular dependency detected: ${moduleId}`);
+    }
+    if (visited.has(moduleId)) return;
+
+    visiting.add(moduleId);
+    const module = enabledModules.find(m => m.id === moduleId);
+    if (module) {
+      module.dependencies.forEach(dep => {
+        if (enabledModuleIds.includes(dep)) {
+          visit(dep);
+        }
+      });
+    }
+    visiting.delete(moduleId);
+    visited.add(moduleId);
+    sorted.push(moduleId);
+  }
+
+  enabledModules
+    .sort((a, b) => (a.loadPriority || 999) - (b.loadPriority || 999))
+    .forEach(module => visit(module.id));
+
+  return sorted;
+}
 
 /**
  * Category badge component
@@ -441,3 +610,5 @@ function Modules(): React.ReactElement {
 }
 
 export default Modules;
+
+export type { Module, ViewMode, DependencyCheck };
