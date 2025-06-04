@@ -6,7 +6,7 @@ module.exports = {
   transform: {
     '^.+\\.[tj]s$': [
       'ts-jest',
-      { tsconfig: '<rootDir>/tsconfig.spec.json', isolatedModules: true },
+      { tsconfig: '<rootDir>/tsconfig.spec.json', isolatedModules: true, diagnostics: false },
     ],
   },
   moduleNameMapper: {
