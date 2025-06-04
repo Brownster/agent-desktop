@@ -16,7 +16,6 @@ import {
   GetCommand,
   PutCommand,
   DeleteCommand,
-  ScanCommand,
   QueryCommand
 } from "@aws-sdk/lib-dynamodb";
 
@@ -54,16 +53,20 @@ export class DynamoDBConfigStore implements IConfigStore {
     } else {
       // Fallback logger (existing code)
       this.logger = {
-        debug: (message, context) => console.debug(`[DynamoDBConfigStore] ${message}`, context || ''),
-        info: (message, context) => console.info(`[DynamoDBConfigStore] ${message}`, context || ''),
-        warn: (message, context) => console.warn(`[DynamoDBConfigStore] ${message}`, context || ''),
-        error: (message, context) => console.error(`[DynamoDBConfigStore] ${message}`, context || ''),
+        debug: (message: string, context?: Record<string, unknown>) =>
+          console.debug(`[DynamoDBConfigStore] ${message}`, context || ''),
+        info: (message: string, context?: Record<string, unknown>) =>
+          console.info(`[DynamoDBConfigStore] ${message}`, context || ''),
+        warn: (message: string, context?: Record<string, unknown>) =>
+          console.warn(`[DynamoDBConfigStore] ${message}`, context || ''),
+        error: (message: string, context?: Record<string, unknown>) =>
+          console.error(`[DynamoDBConfigStore] ${message}`, context || ''),
         createChild: () => this.logger, // Simplistic child creation
-      } as Logger;
+      } as unknown as Logger;
     }
 
     const client = new DynamoDBClient({
-      region: process.env.AWS_REGION || 'us-east-1',
+      region: process.env['AWS_REGION'] || 'us-east-1',
       maxAttempts: 3,
     });
     this.ddbDocClient = DynamoDBDocumentClient.from(client, {
@@ -330,12 +333,16 @@ export class MemoryConfigStore implements IConfigStore {
     } else {
       // Fallback logger
       this.logger = {
-        debug: (message, context) => console.debug(`[MemoryConfigStore] ${message}`, context || ''),
-        info: (message, context) => console.info(`[MemoryConfigStore] ${message}`, context || ''),
-        warn: (message, context) => console.warn(`[MemoryConfigStore] ${message}`, context || ''),
-        error: (message, context) => console.error(`[MemoryConfigStore] ${message}`, context || ''),
+        debug: (message: string, context?: Record<string, unknown>) =>
+          console.debug(`[MemoryConfigStore] ${message}`, context || ''),
+        info: (message: string, context?: Record<string, unknown>) =>
+          console.info(`[MemoryConfigStore] ${message}`, context || ''),
+        warn: (message: string, context?: Record<string, unknown>) =>
+          console.warn(`[MemoryConfigStore] ${message}`, context || ''),
+        error: (message: string, context?: Record<string, unknown>) =>
+          console.error(`[MemoryConfigStore] ${message}`, context || ''),
         createChild: () => this.logger, // Simplistic child creation
-      } as Logger;
+      } as unknown as Logger;
     }
   }
 
@@ -402,15 +409,16 @@ export class MemoryConfigStore implements IConfigStore {
     }
 
     const customerConfig = customerConfigResult.data;
-    const moduleIndex = customerConfig.modules.findIndex(m => m.module_id === config.module_id);
-    
+    const modules = [...customerConfig.modules];
+    const moduleIndex = modules.findIndex(m => m.module_id === config.module_id);
+
     if (moduleIndex >= 0) {
-      customerConfig.modules[moduleIndex] = config;
+      modules[moduleIndex] = config;
     } else {
-      customerConfig.modules.push(config);
+      modules.push(config);
     }
 
-    return this.saveCustomerConfig(customerConfig);
+    return this.saveCustomerConfig({ ...customerConfig, modules });
   }
 
   async deleteModuleConfig(customerId: string, moduleId: string): Promise<Result<void, Error>> {
@@ -420,8 +428,8 @@ export class MemoryConfigStore implements IConfigStore {
     }
 
     const customerConfig = customerConfigResult.data;
-    customerConfig.modules = customerConfig.modules.filter(m => m.module_id !== moduleId);
+    const modules = customerConfig.modules.filter(m => m.module_id !== moduleId);
 
-    return this.saveCustomerConfig(customerConfig);
+    return this.saveCustomerConfig({ ...customerConfig, modules });
   }
 }
