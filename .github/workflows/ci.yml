@@ -203,7 +203,7 @@ jobs:
         run: pnpm nx run-many --target=test --all --parallel=3 --coverage
 
       - name: Upload coverage reports
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
           directory: ./coverage
           flags: unittests
