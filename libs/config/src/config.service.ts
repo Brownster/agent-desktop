@@ -7,12 +7,10 @@ import type {
   CustomerConfig,
   AppConfig,
   ConfigValidationResult,
-  ConfigValidationError,
-  ConfigValidationWarning,
   Environment,
   Result,
 } from '@agent-desktop/types';
-import { success, failure } from '@agent-desktop/types';
+import { failure } from '@agent-desktop/types';
 import type { Logger } from '@agent-desktop/logging';
 import { ConfigValidator } from './config.validator';
 import { DynamoDBConfigStore, MemoryConfigStore, type IConfigStore } from './config.store';
@@ -102,7 +100,7 @@ const DEFAULT_OPTIONS: ConfigServiceOptions = {
   enableWebSocket: true,
   webSocketOptions: {},
   storeType: 'memory',
-  dynamoTableName: process.env.CONFIG_TABLE_NAME || 'ccp-config',
+  dynamoTableName: process.env['CONFIG_TABLE_NAME'] || 'ccp-config',
 };
 
 /**
@@ -123,7 +121,7 @@ export class ConfigService implements IConfigService {
   private readonly watchers = new Map<string, Set<ConfigWatcher>>();
   private readonly cache = new Map<string, { value: unknown; expires: number }>();
   private readonly options: ConfigServiceOptions;
-  private readonly logger?: Logger;
+  private readonly logger: Logger | undefined;
   private readonly validator: ConfigValidator;
   private readonly store: IConfigStore;
   private readonly webSocket?: ConfigWebSocketService;
@@ -578,7 +576,7 @@ export class ConfigService implements IConfigService {
   getEnvironmentConfig(): AppConfig {
     this.logger?.debug('Getting environment configuration');
 
-    const environment = (process.env.NODE_ENV as Environment) || 'development';
+    const environment = (process.env['NODE_ENV'] as Environment) || 'development';
     
     const config: AppConfig = {
       id: 'app-config',
@@ -588,10 +586,10 @@ export class ConfigService implements IConfigService {
       isActive: true,
       environment,
       logLevel: environment === 'production' ? 'info' : 'debug',
-      apiEndpoint: process.env.API_ENDPOINT || `https://api-${environment}.example.com`,
-      websocketEndpoint: process.env.WS_ENDPOINT || `wss://ws-${environment}.example.com`,
-      maxRetryAttempts: Number(process.env.MAX_RETRY_ATTEMPTS) || 3,
-      requestTimeoutMs: Number(process.env.REQUEST_TIMEOUT_MS) || 30000,
+      apiEndpoint: process.env['API_ENDPOINT'] || `https://api-${environment}.example.com`,
+      websocketEndpoint: process.env['WS_ENDPOINT'] || `wss://ws-${environment}.example.com`,
+      maxRetryAttempts: Number(process.env['MAX_RETRY_ATTEMPTS']) || 3,
+      requestTimeoutMs: Number(process.env['REQUEST_TIMEOUT_MS']) || 30000,
       enableTelemetry: environment === 'production',
       enableAnalytics: environment === 'production',
       debugMode: environment !== 'production',
@@ -644,7 +642,7 @@ export class ConfigService implements IConfigService {
    */
   private getNestedValue<T>(key: string): T | undefined {
     const parts = key.split('.');
-    const rootKey = parts[0];
+    const rootKey = parts[0]!;
     const rootValue = this.config.get(rootKey);
 
     if (rootValue === undefined || typeof rootValue !== 'object' || rootValue === null) {
@@ -658,7 +656,8 @@ export class ConfigService implements IConfigService {
         return undefined;
       }
       
-      current = (current as Record<string, unknown>)[parts[i]];
+      const part = parts[i]!;
+      current = (current as Record<string, unknown>)[part];
     }
 
     return current as T | undefined;
@@ -669,7 +668,7 @@ export class ConfigService implements IConfigService {
    */
   private setNestedValue(key: string, value: unknown): void {
     const parts = key.split('.');
-    const rootKey = parts[0];
+    const rootKey = parts[0]!;
     
     let rootValue = this.config.get(rootKey);
     if (rootValue === undefined || typeof rootValue !== 'object' || rootValue === null) {
@@ -680,7 +679,7 @@ export class ConfigService implements IConfigService {
     let current = rootValue as Record<string, unknown>;
     
     for (let i = 1; i < parts.length - 1; i++) {
-      const part = parts[i];
+      const part = parts[i]!;
       
       if (current[part] === undefined || typeof current[part] !== 'object' || current[part] === null) {
         current[part] = {};
@@ -689,7 +688,7 @@ export class ConfigService implements IConfigService {
       current = current[part] as Record<string, unknown>;
     }
 
-    current[parts[parts.length - 1]] = value;
+    current[parts[parts.length - 1]!] = value;
   }
 
   /**
@@ -697,7 +696,7 @@ export class ConfigService implements IConfigService {
    */
   private deleteNestedValue(key: string): boolean {
     const parts = key.split('.');
-    const rootKey = parts[0];
+    const rootKey = parts[0]!;
     const rootValue = this.config.get(rootKey);
 
     if (rootValue === undefined || typeof rootValue !== 'object' || rootValue === null) {
@@ -707,7 +706,7 @@ export class ConfigService implements IConfigService {
     let current = rootValue as Record<string, unknown>;
     
     for (let i = 1; i < parts.length - 1; i++) {
-      const part = parts[i];
+      const part = parts[i]!;
       
       if (current[part] === undefined || typeof current[part] !== 'object' || current[part] === null) {
         return false;
@@ -716,7 +715,7 @@ export class ConfigService implements IConfigService {
       current = current[part] as Record<string, unknown>;
     }
 
-    const lastKey = parts[parts.length - 1];
+    const lastKey = parts[parts.length - 1]!;
     if (lastKey in current) {
       delete current[lastKey];
       return true;

@@ -2,18 +2,21 @@ import { DynamoDBConfigStore } from './config.store';
 import { DynamoDBDocumentClient, GetCommand, PutCommand, DeleteCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { mockClient } from 'aws-sdk-client-mock';
 import 'aws-sdk-client-mock-jest'; // For expect(mock).toHaveReceivedCommand()
-import { success, failure } from '@agent-desktop/types';
 import type { CustomerConfig, ModuleConfig } from '@agent-desktop/types';
-import type { Logger } from '@agent-desktop/logging';
+import { Logger } from '@agent-desktop/logging';
 
-// Mock Logger
-const mockLogger: Logger = {
-  debug: jest.fn(),
-  info: jest.fn(),
-  warn: jest.fn(),
-  error: jest.fn(),
-  createChild: jest.fn().mockReturnThis(), // Return itself for chained calls
-};
+// Mock Logger using real class with spies
+const mockLogger = new Logger({
+  enableConsole: false,
+  enableStructured: false,
+  transports: [],
+  flushIntervalMs: 0,
+});
+jest.spyOn(mockLogger, 'debug');
+jest.spyOn(mockLogger, 'info');
+jest.spyOn(mockLogger, 'warn');
+jest.spyOn(mockLogger, 'error');
+jest.spyOn(mockLogger, 'createChild').mockReturnValue(mockLogger);
 
 describe('DynamoDBConfigStore', () => {
   let store: DynamoDBConfigStore;
@@ -24,26 +27,15 @@ describe('DynamoDBConfigStore', () => {
     ddbMock.reset();
     store = new DynamoDBConfigStore(tableName, mockLogger);
     // Clear mock logger calls before each test
-    (mockLogger.debug as jest.Mock).mockClear();
-    (mockLogger.info as jest.Mock).mockClear();
-    (mockLogger.warn as jest.Mock).mockClear();
-    (mockLogger.error as jest.Mock).mockClear();
+    jest.clearAllMocks();
   });
 
   describe('getCustomerConfig', () => {
     it('should retrieve and return a customer configuration', async () => {
       const mockCustomerId = 'cust123';
-      const mockConfig: CustomerConfig = {
+      const mockConfig: CustomerConfig = (global as any).ConfigTestUtils.createMockConfig({
         customer_id: mockCustomerId,
-        version: 1,
-        modules: [],
-        // other necessary fields for CustomerConfig
-        name: 'Test Customer',
-        region: 'us-east-1',
-        integrations: {},
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+      });
 
       ddbMock.on(GetCommand, {
         TableName: tableName,
@@ -99,16 +91,10 @@ describe('DynamoDBConfigStore', () => {
 
   describe('saveCustomerConfig', () => {
     const mockCustomerId = 'custSave123';
-    const mockConfig: CustomerConfig = {
+    const mockConfig: CustomerConfig = (global as any).ConfigTestUtils.createMockConfig({
       customer_id: mockCustomerId,
-      version: 1,
-      modules: [{ module_id: 'mod1', name: 'Module 1', version: '1.0', settings: {} }],
       name: 'Test Customer Save',
-      region: 'us-west-2',
-      integrations: { crm: 'salesforce' },
-      createdAt: new Date('2023-01-01T00:00:00.000Z'),
-      updatedAt: new Date('2023-01-01T00:00:00.000Z'), // This will be overridden
-    };
+    });
 
     it('should successfully save a customer configuration', async () => {
       ddbMock.on(PutCommand).resolves({}); // Simulate successful put
@@ -128,8 +114,9 @@ describe('DynamoDBConfigStore', () => {
         }),
       });
       // Verify the updatedAt is close to now
-      const actualItem = ddbMock.commandCalls(PutCommand)[0].args[0].input.Item;
-      expect(new Date().getTime() - new Date(actualItem.updatedAt).getTime()).toBeLessThan(2000); // Within 2 seconds
+      const actualItem = ddbMock.commandCalls(PutCommand)[0]?.args[0]?.input.Item as { updatedAt: string } | undefined;
+      expect(actualItem).toBeDefined();
+      expect(new Date().getTime() - new Date(actualItem!['updatedAt']).getTime()).toBeLessThan(2000); // Within 2 seconds
       expect(mockLogger.info).toHaveBeenCalledWith('Saving customer configuration',
         expect.objectContaining({ customerId: mockCustomerId })
       );
@@ -197,14 +184,14 @@ describe('DynamoDBConfigStore', () => {
     // it would need a preceding GetCommand, which is not current implementation.
   });
   describe('listCustomerConfigs', () => {
-    const mockConfig1: CustomerConfig = {
-      customer_id: 'custLis1', version: 1, modules: [], name: 'List Customer 1',
-      region: 'us-east-1', integrations: {}, createdAt: new Date(), updatedAt: new Date(),
-    };
-    const mockConfig2: CustomerConfig = {
-      customer_id: 'custLis2', version: 1, modules: [], name: 'List Customer 2',
-      region: 'us-west-2', integrations: {}, createdAt: new Date(), updatedAt: new Date(),
-    };
+    const mockConfig1: CustomerConfig = (global as any).ConfigTestUtils.createMockConfig({
+      customer_id: 'custLis1',
+      name: 'List Customer 1',
+    });
+    const mockConfig2: CustomerConfig = (global as any).ConfigTestUtils.createMockConfig({
+      customer_id: 'custLis2',
+      name: 'List Customer 2',
+    });
 
     it('should return a list of customer configurations', async () => {
       const mockItems = [mockConfig1, mockConfig2];
@@ -275,7 +262,16 @@ describe('DynamoDBConfigStore', () => {
   describe('getModuleConfig', () => {
     const customerId = 'custModGet123';
     const moduleId = 'mod1';
-    const mockModule: ModuleConfig = { module_id: moduleId, name: 'M1', version: '1', settings: {} } as any;
+    const mockModule: ModuleConfig = {
+      module_id: moduleId,
+      enabled: true,
+      position: 'sidebar',
+      priority: 1,
+      lazy: false,
+      settings: {},
+      permissions: [],
+      dependencies: [],
+    };
 
     it('should retrieve a module', async () => {
       ddbMock.on(GetCommand, { TableName: tableName, Key: { PK: `CUSTOMER#${customerId}`, SK: `MODULE#${moduleId}` } }).resolves({ Item: mockModule });
@@ -303,7 +299,16 @@ describe('DynamoDBConfigStore', () => {
 
   describe('saveModuleConfig', () => {
     const customerId = 'custSave';
-    const moduleConfig: ModuleConfig = { module_id: 'm1', name: 'm1', version: '1', settings: {} } as any;
+    const moduleConfig: ModuleConfig = {
+      module_id: 'm1',
+      enabled: true,
+      position: 'sidebar',
+      priority: 1,
+      lazy: false,
+      settings: {},
+      permissions: [],
+      dependencies: [],
+    };
 
     it('should save module config', async () => {
       ddbMock.on(PutCommand).resolves({});

@@ -85,8 +85,20 @@ export class ConfigWebSocketService {
   private isConnected = false;
 
   constructor(options: Partial<WebSocketOptions> = {}, logger?: Logger) {
-    this.options = { ...DEFAULT_WEBSOCKET_OPTIONS, ...options };
+    const mergedOptions = { ...DEFAULT_WEBSOCKET_OPTIONS, ...options };
+    if (!Number.isInteger(mergedOptions.maxQueueSize) || mergedOptions.maxQueueSize <= 0) {
+      logger?.warn?.('Invalid maxQueueSize provided, using default value', {
+        maxQueueSize: mergedOptions.maxQueueSize,
+      });
+      console.warn('[ConfigWebSocketService] Invalid maxQueueSize provided, using default value', {
+        maxQueueSize: mergedOptions.maxQueueSize,
+      });
+      mergedOptions.maxQueueSize = DEFAULT_WEBSOCKET_OPTIONS.maxQueueSize;
+    }
+
+    this.options = mergedOptions;
     this.maxQueueSize = this.options.maxQueueSize;
+
     if (logger) {
       this.logger = logger.createChild('ConfigWebSocketService');
     } else {

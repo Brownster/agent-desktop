@@ -36,4 +36,13 @@ describe('ConfigWebSocketService queue', () => {
     expect(keys).toEqual(['k3', 'k4']);
     expect(mockLogger.warn).toHaveBeenCalledTimes(2);
   });
+
+  it('should fallback to default queue size when provided value is invalid', () => {
+    const service: any = new ConfigWebSocketService({ maxQueueSize: 0 }, mockLogger as any);
+    expect(service.maxQueueSize).toBe(100);
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      'Invalid maxQueueSize provided, using default value',
+      expect.objectContaining({ maxQueueSize: 0 })
+    );
+  });
 });
