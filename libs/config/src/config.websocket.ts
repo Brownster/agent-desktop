@@ -61,7 +61,7 @@ export interface WebSocketOptions {
  * Default WebSocket options
  */
 const DEFAULT_WEBSOCKET_OPTIONS: WebSocketOptions = {
-  url: process.env.WS_ENDPOINT || 'wss://config-ws.example.com',
+  url: process.env['WS_ENDPOINT'] || 'wss://config-ws.example.com',
   reconnectInterval: 5000,
   maxReconnectAttempts: 10,
   heartbeatInterval: 30000,
@@ -74,11 +74,11 @@ const DEFAULT_WEBSOCKET_OPTIONS: WebSocketOptions = {
  * WebSocket configuration service for real-time updates
  */
 export class ConfigWebSocketService {
-  private ws?: WebSocket;
+  private ws: WebSocket | undefined;
   private readonly options: WebSocketOptions;
   private readonly logger: Logger;
   private reconnectAttempts = 0;
-  private heartbeatTimer?: NodeJS.Timeout;
+  private heartbeatTimer: NodeJS.Timeout | undefined;
   private readonly subscriptions = new Map<string, Set<(event: ConfigChangeEvent) => void>>();
   private readonly messageQueue: WebSocketMessage[] = [];
   private readonly maxQueueSize: number;
@@ -92,12 +92,16 @@ export class ConfigWebSocketService {
     } else {
       // Fallback logger
       this.logger = {
-        debug: (message, context) => console.debug(`[ConfigWebSocketService] ${message}`, context || ''),
-        info: (message, context) => console.info(`[ConfigWebSocketService] ${message}`, context || ''),
-        warn: (message, context) => console.warn(`[ConfigWebSocketService] ${message}`, context || ''),
-        error: (message, context) => console.error(`[ConfigWebSocketService] ${message}`, context || ''),
+        debug: (message: string, context?: Record<string, unknown>) =>
+          console.debug(`[ConfigWebSocketService] ${message}`, context || ''),
+        info: (message: string, context?: Record<string, unknown>) =>
+          console.info(`[ConfigWebSocketService] ${message}`, context || ''),
+        warn: (message: string, context?: Record<string, unknown>) =>
+          console.warn(`[ConfigWebSocketService] ${message}`, context || ''),
+        error: (message: string, context?: Record<string, unknown>) =>
+          console.error(`[ConfigWebSocketService] ${message}`, context || ''),
         createChild: () => this.logger, // Simplistic child creation
-      } as Logger;
+      } as unknown as Logger;
     }
   }
 
@@ -203,9 +207,11 @@ export class ConfigWebSocketService {
     }
 
     // Send subscription message
+    const payload: SubscriptionMessage =
+      pattern !== undefined ? { customerId, pattern } : { customerId };
     const message: WebSocketMessage = {
       type: WebSocketMessageType.CONFIG_SUBSCRIBED,
-      payload: { customerId, pattern } satisfies SubscriptionMessage,
+      payload,
       timestamp: new Date().toISOString(),
       id: this.generateMessageId(),
     };
@@ -240,9 +246,11 @@ export class ConfigWebSocketService {
     }
 
     // Send unsubscription message
+    const payload: SubscriptionMessage =
+      pattern !== undefined ? { customerId, pattern } : { customerId };
     const message: WebSocketMessage = {
       type: WebSocketMessageType.CONFIG_UNSUBSCRIBED,
-      payload: { customerId, pattern } satisfies SubscriptionMessage,
+      payload,
       timestamp: new Date().toISOString(),
       id: this.generateMessageId(),
     };
@@ -363,7 +371,7 @@ export class ConfigWebSocketService {
     for (const [key, callbacks] of this.subscriptions.entries()) {
       if (key.includes(':') && key.startsWith(customerId + ':')) {
         const pattern = key.split(':', 2)[1];
-        if (this.matchesPattern(change.key, pattern)) {
+        if (pattern && this.matchesPattern(change.key, pattern)) {
           for (const callback of callbacks) {
             try {
               callback(change);

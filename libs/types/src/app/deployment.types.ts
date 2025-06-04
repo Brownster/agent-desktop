@@ -3,6 +3,8 @@
  * @module @agent-desktop/types/app/deployment
  */
 
+import type { MonitoringConfig } from './customer.types';
+
 /**
  * Deployment environments
  */
