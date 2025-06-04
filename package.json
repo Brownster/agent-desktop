@@ -1,0 +1,89 @@
+{
+  "name": "@agent-desktop/root",
+  "version": "1.0.0",
+  "description": "Enterprise Amazon Connect CCP - Modular Contact Center Application",
+  "private": true,
+  "packageManager": "pnpm@8.15.1",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "libs/*",
+    "tools/*"
+  ],
+  "scripts": {
+    "build": "nx run-many --target=build --all --parallel=3",
+    "test": "nx run-many --target=test --all --parallel=3",
+    "test:coverage": "nx run-many --target=test --all --parallel=3 --coverage",
+    "test:integration": "nx run-many --target=test:integration --all",
+    "test:e2e": "nx run-many --target=e2e --all",
+    "lint": "nx run-many --target=lint --all --parallel=3",
+    "lint:fix": "nx run-many --target=lint --all --parallel=3 --fix",
+    "type-check": "nx run-many --target=type-check --all --parallel=3",
+    "format:check": "prettier --check .",
+    "format:write": "prettier --write .",
+    "security:audit": "pnpm audit --audit-level=high",
+    "security:scan": "nx run-many --target=security-scan --all",
+    "dev": "nx serve ccp-client",
+    "dev:admin": "nx serve ccp-admin",
+    "clean": "nx reset && rm -rf node_modules",
+    "prepare": "husky install"
+  },
+  "devDependencies": {
+    "@nx/cypress": "^17.3.0",
+    "@nx/eslint": "^17.3.0",
+    "@nx/jest": "^17.3.0",
+    "@nx/js": "^17.3.0",
+    "@nx/react": "^17.3.0",
+    "@nx/vite": "^17.3.0",
+    "@nx/workspace": "^17.3.0",
+    "@testing-library/jest-dom": "^6.2.0",
+    "@testing-library/react": "^14.1.2",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/jest": "^29.5.11",
+    "@types/node": "^20.11.5",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "eslint": "^8.56.0",
+    "eslint-plugin-jsx-a11y": "^6.8.0",
+    "eslint-plugin-react": "^7.33.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-security": "^1.7.1",
+    "eslint-plugin-sonarjs": "^0.23.0",
+    "husky": "^8.0.3",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "nx": "^17.3.0",
+    "prettier": "^3.2.4",
+    "ts-jest": "^29.3.4",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.11",
+    "vitest": "^1.2.0"
+  },
+  "dependencies": {
+    "@headlessui/react": "^1.7.17",
+    "date-fns": "^3.3.1",
+    "lucide-react": "^0.316.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tailwindcss": "^3.4.1",
+    "zod": "^3.22.4",
+    "zustand": "^4.4.7"
+  },
+  "keywords": [
+    "amazon-connect",
+    "contact-center",
+    "ccp",
+    "vdi",
+    "enterprise",
+    "modular"
+  ],
+  "author": "Agent Desktop Team",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agent-desktop/agent-desktop.git"
+  }
+}

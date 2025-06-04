@@ -1,0 +1,284 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * Global styles for CCP Admin Dashboard
+ */
+
+@layer base {
+  /* Font loading */
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+  /* Root variables */
+  :root {
+    /* Color scheme */
+    --color-brand-primary: theme('colors.connect.600');
+    --color-brand-secondary: theme('colors.connect.700');
+    --color-brand-accent: theme('colors.connect.500');
+    
+    /* Typography */
+    --font-family-primary: theme('fontFamily.sans');
+    --font-family-mono: theme('fontFamily.mono');
+    
+    /* Spacing */
+    --spacing-page: theme('spacing.8');
+    --spacing-section: theme('spacing.6');
+    --spacing-component: theme('spacing.4');
+    
+    /* Border radius */
+    --radius-sm: theme('borderRadius.md');
+    --radius-md: theme('borderRadius.lg');
+    --radius-lg: theme('borderRadius.xl');
+    
+    /* Shadows */
+    --shadow-soft: theme('boxShadow.soft');
+    --shadow-medium: theme('boxShadow.medium');
+    --shadow-hard: theme('boxShadow.hard');
+  }
+
+  /* Base styles */
+  html {
+    font-family: var(--font-family-primary);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-gray-50 text-gray-900 antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+
+  /* Focus styles */
+  *:focus {
+    @apply outline-none;
+  }
+
+  *:focus-visible {
+    @apply ring-2 ring-connect-500 ring-offset-2 ring-offset-white;
+  }
+
+  /* Selection styles */
+  ::selection {
+    @apply bg-connect-100 text-connect-900;
+  }
+
+  /* Scrollbar styles */
+  ::-webkit-scrollbar {
+    @apply w-2 h-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-100;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400;
+  }
+
+  /* Dark scrollbar for dark backgrounds */
+  .dark-scrollbar::-webkit-scrollbar-track {
+    @apply bg-gray-800;
+  }
+
+  .dark-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-gray-600;
+  }
+
+  .dark-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-500;
+  }
+}
+
+@layer components {
+  /* Button variants */
+  .btn {
+    @apply inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-primary {
+    @apply btn bg-connect-600 text-white hover:bg-connect-700 focus:ring-connect-500;
+  }
+
+  .btn-secondary {
+    @apply btn bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500;
+  }
+
+  .btn-success {
+    @apply btn bg-success-600 text-white hover:bg-success-700 focus:ring-success-500;
+  }
+
+  .btn-error {
+    @apply btn bg-error-600 text-white hover:bg-error-700 focus:ring-error-500;
+  }
+
+  .btn-outline {
+    @apply btn border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:ring-connect-500;
+  }
+
+  .btn-ghost {
+    @apply btn text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:ring-connect-500;
+  }
+
+  /* Input variants */
+  .input {
+    @apply block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-connect-500 focus:border-connect-500 sm:text-sm;
+  }
+
+  .input-error {
+    @apply input border-error-300 text-error-900 placeholder-error-300 focus:outline-none focus:ring-error-500 focus:border-error-500;
+  }
+
+  /* Card variants */
+  .card {
+    @apply bg-white rounded-lg shadow-soft border border-gray-200;
+  }
+
+  .card-hover {
+    @apply card transition-shadow duration-200 hover:shadow-medium;
+  }
+
+  .card-interactive {
+    @apply card-hover cursor-pointer transform transition-transform duration-200 hover:scale-[1.02];
+  }
+
+  /* Badge variants */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-primary {
+    @apply badge bg-connect-100 text-connect-800;
+  }
+
+  .badge-success {
+    @apply badge bg-success-100 text-success-800;
+  }
+
+  .badge-warning {
+    @apply badge bg-warning-100 text-warning-800;
+  }
+
+  .badge-error {
+    @apply badge bg-error-100 text-error-800;
+  }
+
+  .badge-gray {
+    @apply badge bg-gray-100 text-gray-800;
+  }
+
+  /* Loading spinner */
+  .spinner {
+    @apply animate-spin rounded-full border-2 border-gray-200 border-t-connect-600;
+  }
+
+  /* Table styles */
+  .table {
+    @apply min-w-full divide-y divide-gray-200;
+  }
+
+  .table-header {
+    @apply bg-gray-50;
+  }
+
+  .table-header-cell {
+    @apply px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider;
+  }
+
+  .table-body {
+    @apply bg-white divide-y divide-gray-200;
+  }
+
+  .table-body-row {
+    @apply hover:bg-gray-50 transition-colors duration-150;
+  }
+
+  .table-body-cell {
+    @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900;
+  }
+
+  /* Status indicators */
+  .status-online {
+    @apply h-2 w-2 bg-success-400 rounded-full;
+  }
+
+  .status-offline {
+    @apply h-2 w-2 bg-gray-400 rounded-full;
+  }
+
+  .status-error {
+    @apply h-2 w-2 bg-error-400 rounded-full;
+  }
+
+  .status-warning {
+    @apply h-2 w-2 bg-warning-400 rounded-full;
+  }
+
+  /* Animation utilities */
+  .fade-in {
+    @apply animate-fade-in;
+  }
+
+  .slide-in {
+    @apply animate-slide-in;
+  }
+
+  .pulse-slow {
+    @apply animate-pulse-slow;
+  }
+}
+
+@layer utilities {
+  /* Custom utilities */
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .text-pretty {
+    text-wrap: pretty;
+  }
+
+  /* Layout utilities */
+  .sidebar-width {
+    width: theme('spacing.64');
+  }
+
+  .content-with-sidebar {
+    margin-left: theme('spacing.64');
+  }
+
+  /* Mobile responsive sidebar */
+  @media (max-width: 768px) {
+    .sidebar-width {
+      width: 100%;
+    }
+
+    .content-with-sidebar {
+      margin-left: 0;
+    }
+  }
+
+  /* Safe area utilities for mobile */
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-left {
+    padding-left: env(safe-area-inset-left);
+  }
+
+  .safe-right {
+    padding-right: env(safe-area-inset-right);
+  }
+}

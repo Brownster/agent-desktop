@@ -1,0 +1,970 @@
+# Phase 1: Enterprise Foundation - Detailed Implementation Plan
+## Amazon Connect CCP - Weeks 1-4
+
+---
+
+## Overview
+
+Phase 1 establishes enterprise-grade foundations focusing on resilience, scalability, reliability, comprehensive logging, modular architecture, extensive testing, and developer experience. This phase creates the robust infrastructure that will support all future development.
+
+---
+
+## Week 1: Infrastructure & Development Environment
+
+### 1.1 Project Structure & Monorepo Setup
+
+**Deliverable:** Enterprise-grade monorepo with CI/CD pipeline
+**Duration:** 2 days
+
+```
+amazon-connect-ccp/
+├── apps/
+│   ├── ccp-admin/                 # Configuration dashboard
+│   ├── ccp-client/                # Main CCP application
+│   └── ccp-docs/                  # Developer documentation site
+├── libs/
+│   ├── core/                      # Core business logic
+│   ├── ui-components/             # Shared UI components
+│   ├── config/                    # Configuration management
+│   ├── logging/                   # Centralized logging
+│   ├── testing/                   # Testing utilities
+│   └── types/                     # TypeScript definitions
+├── infrastructure/
+│   ├── aws-cdk/                   # Infrastructure as Code
+│   ├── terraform/                 # Multi-cloud infrastructure
+│   └── docker/                    # Container configurations
+├── tools/
+│   ├── build/                     # Custom build tools
+│   ├── scripts/                   # Development scripts
+│   └── generators/                # Code generators
+└── docs/                          # Architecture documentation
+```
+
+**Technology Stack:**
+```json
+{
+  "monorepo": "Nx 17+ with TypeScript",
+  "package_manager": "pnpm (performance + workspace support)",
+  "node_version": "20.x LTS",
+  "typescript": "5.2+",
+  "build_system": "Vite + SWC (fast compilation)",
+  "bundler": "Webpack 5 with Module Federation"
+}
+```
+
+### 1.2 Infrastructure as Code Setup
+
+**Deliverable:** Multi-environment AWS infrastructure
+**Duration:** 2 days
+
+```typescript
+// infrastructure/aws-cdk/lib/ccp-stack.ts
+import * as cdk from 'aws-cdk-lib';
+import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+
+export class CCPStack extends cdk.Stack {
+  constructor(scope: Construct, id: string, props: CCPStackProps) {
+    super(scope, id, props);
+
+    // S3 Bucket for static hosting with versioning
+    const hostingBucket = new s3.Bucket(this, 'CCPHostingBucket', {
+      versioned: true,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      enforceSSL: true,
+      lifecycleRules: [{
+        id: 'DeleteOldVersions',
+        expiration: cdk.Duration.days(90),
+        noncurrentVersionExpiration: cdk.Duration.days(7)
+      }]
+    });
+
+    // CloudFront distribution with edge caching
+    const distribution = new cloudfront.Distribution(this, 'CCPDistribution', {
+      defaultBehavior: {
+        origin: new origins.S3Origin(hostingBucket),
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        compress: true
+      },
+      errorResponses: [
+        {
+          httpStatus: 404,
+          responseHttpStatus: 200,
+          responsePagePath: '/index.html',
+          ttl: cdk.Duration.minutes(5)
+        }
+      ],
+      priceClass: cloudfront.PriceClass.PRICE_CLASS_100
+    });
+
+    // DynamoDB for configuration with global tables
+    const configTable = new dynamodb.Table(this, 'CCPConfigTable', {
+      tableName: `ccp-config-${props.environment}`,
+      partitionKey: { name: 'customer_id', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'config_type', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      encryption: dynamodb.TableEncryption.AWS_MANAGED,
+      pointInTimeRecovery: true,
+      stream: dynamodb.StreamViewType.NEW_AND_OLD_IMAGES,
+      globalSecondaryIndexes: [{
+        indexName: 'ConfigTypeIndex',
+        partitionKey: { name: 'config_type', type: dynamodb.AttributeType.STRING }
+      }]
+    });
+
+    // Lambda function for configuration API
+    const configApi = new lambda.Function(this, 'CCPConfigAPI', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('dist/lambda'),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 512,
+      environment: {
+        CONFIG_TABLE_NAME: configTable.tableName,
+        LOG_LEVEL: props.logLevel || 'INFO'
+      },
+      tracing: lambda.Tracing.ACTIVE
+    });
+
+    // API Gateway with throttling and caching
+    const api = new apigateway.RestApi(this, 'CCPConfigAPIGateway', {
+      restApiName: `ccp-config-api-${props.environment}`,
+      description: 'Amazon Connect CCP Configuration API',
+      defaultThrottleSettings: {
+        rateLimit: 1000,
+        burstLimit: 2000
+      },
+      deployOptions: {
+        stageName: props.environment,
+        cachingEnabled: true,
+        cacheClusterEnabled: true,
+        cacheClusterSize: '0.5',
+        throttlingRateLimit: 1000,
+        throttlingBurstLimit: 2000,
+        loggingLevel: apigateway.MethodLoggingLevel.INFO
+      }
+    });
+  }
+}
+```
+
+### 1.3 CI/CD Pipeline Setup
+
+**Deliverable:** Automated build, test, and deployment pipeline
+**Duration:** 2 days
+
+```yaml
+# .github/workflows/ci-cd.yml
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: '20.x'
+  PNPM_VERSION: '8.x'
+
+jobs:
+  quality-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: ${{ env.PNPM_VERSION }}
+        run_install: false
+
+    - name: Get pnpm store directory
+      shell: bash
+      run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+    - name: Setup pnpm cache
+      uses: actions/cache@v3
+      with:
+        path: ${{ env.STORE_PATH }}
+        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-pnpm-store-
+
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+
+    - name: Code quality checks
+      run: |
+        pnpm nx run-many --target=lint --all --parallel=3
+        pnpm nx run-many --target=type-check --all --parallel=3
+        pnpm nx format:check
+
+    - name: Security audit
+      run: |
+        pnpm audit --audit-level=high
+        pnpm nx run-many --target=security-scan --all
+
+    - name: Build all projects
+      run: pnpm nx run-many --target=build --all --parallel=3
+
+    - name: Run unit tests
+      run: |
+        pnpm nx run-many --target=test --all --parallel=3 --coverage
+
+    - name: Run integration tests
+      run: |
+        pnpm nx run-many --target=test:integration --all
+
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        directory: ./coverage
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: true
+
+    - name: SonarCloud Scan
+      uses: SonarSource/sonarcloud-github-action@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  deploy-staging:
+    needs: quality-checks
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+
+    steps:
+    - name: Deploy to staging
+      run: |
+        pnpm nx deploy:staging ccp-client
+        pnpm nx deploy:staging ccp-admin
+
+    - name: Run E2E tests
+      run: |
+        pnpm nx e2e:staging ccp-client-e2e
+
+    - name: Performance tests
+      run: |
+        pnpm nx performance:test ccp-client
+
+  deploy-production:
+    needs: quality-checks
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+    - name: Deploy to production
+      run: |
+        pnpm nx deploy:prod ccp-client
+        pnpm nx deploy:prod ccp-admin
+
+    - name: Smoke tests
+      run: |
+        pnpm nx smoke:test ccp-client
+```
+
+### 1.4 Development Standards & Guidelines
+
+**Deliverable:** Comprehensive development standards
+**Duration:** 2 days
+
+```typescript
+// tools/eslint-config/index.js
+module.exports = {
+  extends: [
+    '@nx/eslint-plugin-nx/typescript',
+    '@typescript-eslint/recommended',
+    '@typescript-eslint/recommended-requiring-type-checking',
+    'plugin:security/recommended',
+    'plugin:sonarjs/recommended'
+  ],
+  rules: {
+    // Enforce strict TypeScript
+    '@typescript-eslint/no-explicit-any': 'error',
+    '@typescript-eslint/no-unused-vars': 'error',
+    '@typescript-eslint/explicit-function-return-type': 'error',
+    '@typescript-eslint/no-floating-promises': 'error',
+
+    // Security rules
+    'security/detect-object-injection': 'error',
+    'security/detect-unsafe-regex': 'error',
+
+    // Code quality
+    'complexity': ['error', { max: 10 }],
+    'max-lines-per-function': ['error', { max: 50 }],
+    'max-depth': ['error', { max: 4 }],
+
+    // Documentation
+    'require-jsdoc': ['error', {
+      require: {
+        FunctionDeclaration: true,
+        MethodDefinition: true,
+        ClassDeclaration: true
+      }
+    }]
+  }
+};
+```
+
+---
+
+## Week 2: Core Architecture & Logging System
+
+### 2.1 Modular Architecture Foundation
+
+**Deliverable:** Module loading system with dependency injection
+**Duration:** 3 days
+
+```typescript
+// libs/core/src/module-system/module-registry.ts
+import { Logger } from '../logging/logger';
+import { ConfigService } from '../config/config.service';
+import { HealthCheck } from '../health/health-check';
+
+/**
+ * Module metadata interface defining module structure
+ */
+interface ModuleMetadata {
+  id: string;
+  name: string;
+  version: string;
+  dependencies: string[];
+  loadPriority: number;
+  lazy: boolean;
+  healthChecks?: HealthCheck[];
+}
+
+/**
+ * Module interface that all CCP modules must implement
+ */
+interface CCPModule {
+  metadata: ModuleMetadata;
+  initialize(context: ModuleContext): Promise<void>;
+  destroy(): Promise<void>;
+  getComponent(): React.ComponentType<any>;
+  getHealthStatus(): HealthStatus;
+}
+
+/**
+ * Module context provided to each module during initialization
+ */
+interface ModuleContext {
+  logger: Logger;
+  config: ConfigService;
+  eventBus: EventBus;
+  dependencies: Map<string, CCPModule>;
+}
+
+/**
+ * Enterprise-grade module registry with dependency management
+ */
+export class ModuleRegistry {
+  private modules = new Map<string, CCPModule>();
+  private loadedModules = new Map<string, CCPModule>();
+  private dependencies = new Map<string, string[]>();
+  private logger: Logger;
+  private config: ConfigService;
+
+  constructor(logger: Logger, config: ConfigService) {
+    this.logger = logger.createChild('ModuleRegistry');
+    this.config = config;
+  }
+
+  /**
+   * Register a module with the registry
+   */
+  async registerModule(moduleFactory: () => Promise<CCPModule>): Promise<void> {
+    const startTime = performance.now();
+
+    try {
+      this.logger.debug('Starting module registration', {
+        timestamp: new Date().toISOString()
+      });
+
+      const module = await moduleFactory();
+
+      // Validate module metadata
+      this.validateModuleMetadata(module.metadata);
+
+      // Check for circular dependencies
+      this.validateDependencies(module.metadata);
+
+      this.modules.set(module.metadata.id, module);
+      this.dependencies.set(module.metadata.id, module.metadata.dependencies);
+
+      this.logger.info('Module registered successfully', {
+        moduleId: module.metadata.id,
+        version: module.metadata.version,
+        dependencies: module.metadata.dependencies,
+        registrationTime: performance.now() - startTime
+      });
+
+    } catch (error) {
+      this.logger.error('Failed to register module', {
+        error: error.message,
+        stack: error.stack,
+        registrationTime: performance.now() - startTime
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Load modules based on customer configuration
+   */
+  async loadModules(customerConfig: CustomerConfig): Promise<LoadedModule[]> {
+    const startTime = performance.now();
+    const loadResults: LoadedModule[] = [];
+
+    try {
+      this.logger.info('Starting module loading process', {
+        customerId: customerConfig.customer_id,
+        enabledModules: customerConfig.modules.filter(m => m.enabled).length,
+        totalModules: customerConfig.modules.length
+      });
+
+      // Sort modules by dependency order and priority
+      const sortedModules = this.resolveDependencyOrder(customerConfig.modules);
+
+      // Load modules in dependency order
+      for (const moduleConfig of sortedModules) {
+        if (!moduleConfig.enabled) {
+          this.logger.debug('Skipping disabled module', {
+            moduleId: moduleConfig.module_id
+          });
+          continue;
+        }
+
+        const loadResult = await this.loadSingleModule(moduleConfig, customerConfig);
+        loadResults.push(loadResult);
+      }
+
+      this.logger.info('Module loading completed', {
+        customerId: customerConfig.customer_id,
+        loadedCount: loadResults.filter(r => r.status === 'loaded').length,
+        failedCount: loadResults.filter(r => r.status === 'failed').length,
+        totalLoadTime: performance.now() - startTime
+      });
+
+      return loadResults;
+
+    } catch (error) {
+      this.logger.error('Critical failure in module loading', {
+        customerId: customerConfig.customer_id,
+        error: error.message,
+        stack: error.stack,
+        totalLoadTime: performance.now() - startTime
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Load a single module with comprehensive error handling
+   */
+  private async loadSingleModule(
+    moduleConfig: ModuleConfig,
+    customerConfig: CustomerConfig
+  ): Promise<LoadedModule> {
+    const moduleStartTime = performance.now();
+    const moduleLogger = this.logger.createChild(`Module:${moduleConfig.module_id}`);
+
+    try {
+      moduleLogger.debug('Starting module load', {
+        moduleId: moduleConfig.module_id,
+        position: moduleConfig.position,
+        settings: moduleConfig.settings
+      });
+
+      const module = this.modules.get(moduleConfig.module_id);
+      if (!module) {
+        throw new Error(`Module not found: ${moduleConfig.module_id}`);
+      }
+
+      // Verify dependencies are loaded
+      await this.verifyDependencies(module.metadata.dependencies);
+
+      // Create module context
+      const context: ModuleContext = {
+        logger: moduleLogger,
+        config: this.config,
+        eventBus: this.eventBus,
+        dependencies: this.loadedModules
+      };
+
+      // Initialize module
+      await module.initialize(context);
+
+      // Run health checks
+      const healthStatus = await module.getHealthStatus();
+      if (healthStatus.status !== 'healthy') {
+        moduleLogger.warn('Module health check failed', {
+          moduleId: moduleConfig.module_id,
+          healthStatus
+        });
+      }
+
+      this.loadedModules.set(moduleConfig.module_id, module);
+
+      const loadTime = performance.now() - moduleStartTime;
+      moduleLogger.info('Module loaded successfully', {
+        moduleId: moduleConfig.module_id,
+        loadTime,
+        healthStatus: healthStatus.status
+      });
+
+      return {
+        moduleId: moduleConfig.module_id,
+        status: 'loaded',
+        component: module.getComponent(),
+        loadTime,
+        healthStatus
+      };
+
+    } catch (error) {
+      const loadTime = performance.now() - moduleStartTime;
+      moduleLogger.error('Failed to load module', {
+        moduleId: moduleConfig.module_id,
+        error: error.message,
+        stack: error.stack,
+        loadTime
+      });
+
+      return {
+        moduleId: moduleConfig.module_id,
+        status: 'failed',
+        error: error.message,
+        loadTime
+      };
+    }
+  }
+
+  /**
+   * Validate module metadata for completeness and correctness
+   */
+  private validateModuleMetadata(metadata: ModuleMetadata): void {
+    const requiredFields = ['id', 'name', 'version', 'dependencies'];
+
+    for (const field of requiredFields) {
+      if (!metadata[field]) {
+        throw new Error(`Module metadata missing required field: ${field}`);
+      }
+    }
+
+    // Validate version format (semver)
+    const versionRegex = /^\d+\.\d+\.\d+(-[\w\d\-]+)?$/;
+    if (!versionRegex.test(metadata.version)) {
+      throw new Error(`Invalid version format: ${metadata.version}`);
+    }
+
+    // Validate module ID format
+    const idRegex = /^[a-z][a-z0-9\-]*$/;
+    if (!idRegex.test(metadata.id)) {
+      throw new Error(`Invalid module ID format: ${metadata.id}`);
+    }
+  }
+
+  /**
+   * Detect circular dependencies in module graph
+   */
+  private validateDependencies(metadata: ModuleMetadata): void {
+    const visited = new Set<string>();
+    const recursionStack = new Set<string>();
+
+    const hasCycle = (moduleId: string): boolean => {
+      if (recursionStack.has(moduleId)) {
+        return true; // Cycle detected
+      }
+
+      if (visited.has(moduleId)) {
+        return false; // Already processed
+      }
+
+      visited.add(moduleId);
+      recursionStack.add(moduleId);
+
+      const deps = this.dependencies.get(moduleId) || [];
+      for (const dep of deps) {
+        if (hasCycle(dep)) {
+          return true;
+        }
+      }
+
+      recursionStack.delete(moduleId);
+      return false;
+    };
+
+    if (hasCycle(metadata.id)) {
+      throw new Error(`Circular dependency detected for module: ${metadata.id}`);
+    }
+  }
+}
+```
+
+### 2.2 Enterprise Logging System
+
+**Deliverable:** Structured logging with multiple output targets
+**Duration:** 2 days
+
+```typescript
+// libs/logging/src/logger.ts
+import { performance } from 'perf_hooks';
+
+/**
+ * Log levels in order of severity
+ */
+export enum LogLevel {
+  DEBUG = 0,
+  INFO = 1,
+  WARN = 2,
+  ERROR = 3,
+  FATAL = 4
+}
+
+/**
+ * Structured log entry interface
+ */
+interface LogEntry {
+  timestamp: string;
+  level: LogLevel;
+  message: string;
+  context: string;
+  metadata?: Record<string, any>;
+  correlationId?: string;
+  sessionId?: string;
+  userId?: string;
+  customerId?: string;
+  traceId?: string;
+  spanId?: string;
+  performance?: {
+    duration?: number;
+    memory?: NodeJS.MemoryUsage;
+  };
+  error?: {
+    name: string;
+    message: string;
+    stack?: string;
+  };
+}
+
+/**
+ * Log transport interface for different output targets
+ */
+interface LogTransport {
+  name: string;
+  write(entry: LogEntry): Promise<void>;
+  flush?(): Promise<void>;
+  close?(): Promise<void>;
+}
+
+/**
+ * Console transport for development
+ */
+class ConsoleTransport implements LogTransport {
+  name = 'console';
+
+  async write(entry: LogEntry): Promise<void> {
+    const colorMap = {
+      [LogLevel.DEBUG]: '\x1b[36m', // Cyan
+      [LogLevel.INFO]: '\x1b[32m',  // Green
+      [LogLevel.WARN]: '\x1b[33m',  // Yellow
+      [LogLevel.ERROR]: '\x1b[31m', // Red
+      [LogLevel.FATAL]: '\x1b[35m'  // Magenta
+    };
+
+    const reset = '\x1b[0m';
+    const color = colorMap[entry.level];
+    const levelName = LogLevel[entry.level];
+
+    console.log(
+      `${color}[${entry.timestamp}] ${levelName} [${entry.context}]:${reset} ${entry.message}`,
+      entry.metadata ? entry.metadata : ''
+    );
+  }
+}
+
+/**
+ * CloudWatch transport for AWS environments
+ */
+class CloudWatchTransport implements LogTransport {
+  name = 'cloudwatch';
+  private logGroup: string;
+  private logStream: string;
+  private buffer: LogEntry[] = [];
+  private flushInterval: NodeJS.Timeout;
+
+  constructor(logGroup: string, logStream: string) {
+    this.logGroup = logGroup;
+    this.logStream = logStream;
+
+    // Auto-flush every 5 seconds
+    this.flushInterval = setInterval(() => {
+      this.flush().catch(console.error);
+    }, 5000);
+  }
+
+  async write(entry: LogEntry): Promise<void> {
+    this.buffer.push(entry);
+
+    // Flush if buffer is getting full
+    if (this.buffer.length >= 100) {
+      await this.flush();
+    }
+  }
+
+  async flush(): Promise<void> {
+    if (this.buffer.length === 0) return;
+
+    const events = this.buffer.map(entry => ({
+      timestamp: new Date(entry.timestamp).getTime(),
+      message: JSON.stringify(entry)
+    }));
+
+    try {
+      // AWS CloudWatch Logs SDK call would go here
+      console.log('Flushing to CloudWatch:', events.length, 'entries');
+      this.buffer = [];
+    } catch (error) {
+      console.error('Failed to flush to CloudWatch:', error);
+      // Keep entries in buffer for retry
+    }
+  }
+
+  async close(): Promise<void> {
+    clearInterval(this.flushInterval);
+    await this.flush();
+  }
+}
+
+/**
+ * Enterprise logger with structured logging and multiple transports
+ */
+export class Logger {
+  private context: string;
+  private level: LogLevel;
+  private transports: LogTransport[] = [];
+  private correlationId?: string;
+  private sessionId?: string;
+  private userId?: string;
+  private customerId?: string;
+
+  constructor(
+    context: string,
+    level: LogLevel = LogLevel.INFO,
+    transports: LogTransport[] = [new ConsoleTransport()]
+  ) {
+    this.context = context;
+    this.level = level;
+    this.transports = transports;
+  }
+
+  /**
+   * Create a child logger with additional context
+   */
+  createChild(childContext: string): Logger {
+    const child = new Logger(
+      `${this.context}:${childContext}`,
+      this.level,
+      this.transports
+    );
+
+    child.correlationId = this.correlationId;
+    child.sessionId = this.sessionId;
+    child.userId = this.userId;
+    child.customerId = this.customerId;
+
+    return child;
+  }
+
+  /**
+   * Set correlation context for request tracing
+   */
+  setContext(context: {
+    correlationId?: string;
+    sessionId?: string;
+    userId?: string;
+    customerId?: string;
+  }): void {
+    Object.assign(this, context);
+  }
+
+  /**
+   * Debug level logging
+   */
+  debug(message: string, metadata?: Record<string, any>): void {
+    this.log(LogLevel.DEBUG, message, metadata);
+  }
+
+  /**
+   * Info level logging
+   */
+  info(message: string, metadata?: Record<string, any>): void {
+    this.log(LogLevel.INFO, message, metadata);
+  }
+
+  /**
+   * Warning level logging
+   */
+  warn(message: string, metadata?: Record<string, any>): void {
+    this.log(LogLevel.WARN, message, metadata);
+  }
+
+  /**
+   * Error level logging
+   */
+  error(message: string, metadata?: Record<string, any>): void {
+    this.log(LogLevel.ERROR, message, metadata);
+  }
+
+  /**
+   * Fatal level logging
+   */
+  fatal(message: string, metadata?: Record<string, any>): void {
+    this.log(LogLevel.FATAL, message, metadata);
+  }
+
+  /**
+   * Time a function execution and log the duration
+   */
+  async time<T>(
+    operation: string,
+    fn: () => Promise<T>,
+    level: LogLevel = LogLevel.DEBUG
+  ): Promise<T> {
+    const startTime = performance.now();
+    const startMemory = process.memoryUsage();
+
+    this.log(level, `Starting ${operation}`, {
+      operation,
+      startMemory: this.formatMemoryUsage(startMemory)
+    });
+
+    try {
+      const result = await fn();
+      const duration = performance.now() - startTime;
+      const endMemory = process.memoryUsage();
+
+      this.log(level, `Completed ${operation}`, {
+        operation,
+        duration: `${duration.toFixed(2)}ms`,
+        endMemory: this.formatMemoryUsage(endMemory),
+        memoryDelta: this.calculateMemoryDelta(startMemory, endMemory)
+      });
+
+      return result;
+    } catch (error) {
+      const duration = performance.now() - startTime;
+      const endMemory = process.memoryUsage();
+
+      this.error(`Failed ${operation}`, {
+        operation,
+        duration: `${duration.toFixed(2)}ms`,
+        endMemory: this.formatMemoryUsage(endMemory),
+        error: {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        }
+      });
+
+      throw error;
+    }
+  }
+
+  /**
+   * Core logging method
+   */
+  private log(level: LogLevel, message: string, metadata?: Record<string, any>): void {
+    if (level < this.level) {
+      return; // Below configured log level
+    }
+
+    const entry: LogEntry = {
+      timestamp: new Date().toISOString(),
+      level,
+      message,
+      context: this.context,
+      metadata,
+      correlationId: this.correlationId,
+      sessionId: this.sessionId,
+      userId: this.userId,
+      customerId: this.customerId,
+      traceId: this.generateTraceId(),
+      spanId: this.generateSpanId()
+    };
+
+    // Write to all transports asynchronously
+    this.transports.forEach(transport => {
+      transport.write(entry).catch(error => {
+        console.error(`Failed to write to transport ${transport.name}:`, error);
+      });
+    });
+  }
+
+  /**
+   * Format memory usage for logging
+   */
+  private formatMemoryUsage(usage: NodeJS.MemoryUsage): Record<string, string> {
+    return {
+      rss: `${Math.round(usage.rss / 1024 / 1024)}MB`,
+      heapTotal: `${Math.round(usage.heapTotal / 1024 / 1024)}MB`,
+      heapUsed: `${Math.round(usage.heapUsed / 1024 / 1024)}MB`,
+      external: `${Math.round(usage.external / 1024 / 1024)}MB`
+    };
+  }
+
+  /**
+   * Calculate memory delta between two measurements
+   */
+  private calculateMemoryDelta(start: NodeJS.MemoryUsage, end: NodeJS.MemoryUsage): Record<string, string> {
+    return {
+      rss: `${Math.round((end.rss - start.rss) / 1024 / 1024)}MB`,
+      heapTotal: `${Math.round((end.heapTotal - start.heapTotal) / 1024 / 1024)}MB`,
+      heapUsed: `${Math.round((end.heapUsed - start.heapUsed) / 1024 / 1024)}MB`,
+      external: `${Math.round((end.external - start.external) / 1024 / 1024)}MB`
+    };
+  }
+
+  /**
+   * Generate trace ID for distributed tracing
+   */
+  private generateTraceId(): string {
+    return `trace_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  /**
+   * Generate span ID for distributed tracing
+   */
+  private generateSpanId(): string {
+    return `span_${Math.random().toString(36).substr(2, 9)}`;
+  }
+}
+
+/**
+ * Logger factory for creating configured loggers
+ */
+export class LoggerFactory {
+  private static instance: LoggerFactory;
+  private defaultLevel: LogLevel = LogLevel.INFO;
+  private transports: LogTransport[] = [];
+
+  private constructor

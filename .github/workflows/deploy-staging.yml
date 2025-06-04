@@ -1,0 +1,343 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - development
+
+env:
+  NODE_VERSION: '20.x'
+  PNPM_VERSION: '8.x'
+  AWS_REGION: 'us-east-1'
+
+jobs:
+  # Detect changes
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      apps: ${{ steps.changes.outputs.apps }}
+      infrastructure: ${{ steps.changes.outputs.infrastructure }}
+      config-api: ${{ steps.changes.outputs.config-api }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changes
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            apps:
+              - 'apps/**'
+              - 'libs/**'
+            infrastructure:
+              - 'infrastructure/aws-cdk/**'
+            config-api:
+              - 'infrastructure/lambda/config-api/**'
+              - 'libs/types/**'
+
+  # Build applications
+  build-apps:
+    name: Build Applications
+    runs-on: ubuntu-latest
+    needs: [changes]
+    if: needs.changes.outputs.apps == 'true'
+    environment: staging
+    strategy:
+      matrix:
+        app: [ccp-admin, ccp-client, ccp-docs]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build ${{ matrix.app }}
+        run: pnpm nx build ${{ matrix.app }}
+        env:
+          VITE_ENVIRONMENT: staging
+          VITE_API_BASE_URL: ${{ secrets.STAGING_API_BASE_URL }}
+          VITE_WS_ENDPOINT: ${{ secrets.STAGING_WS_ENDPOINT }}
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.app }}-staging-build
+          path: apps/${{ matrix.app }}/dist
+          retention-days: 7
+
+  # Deploy infrastructure
+  deploy-infrastructure:
+    name: Deploy Infrastructure
+    runs-on: ubuntu-latest
+    needs: [changes]
+    if: needs.changes.outputs.infrastructure == 'true' || needs.changes.outputs.config-api == 'true'
+    environment: staging
+    outputs:
+      config-api-url: ${{ steps.deploy.outputs.config-api-url }}
+      config-table-name: ${{ steps.deploy.outputs.config-table-name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install CDK dependencies
+        working-directory: infrastructure/aws-cdk
+        run: pnpm install
+
+      - name: Build Lambda function
+        if: needs.changes.outputs.config-api == 'true'
+        working-directory: infrastructure/lambda/config-api
+        run: |
+          pnpm install
+          pnpm run build
+
+      - name: CDK Bootstrap (if needed)
+        working-directory: infrastructure/aws-cdk
+        run: |
+          pnpm cdk bootstrap aws://${{ secrets.AWS_ACCOUNT_ID }}/${{ env.AWS_REGION }} || true
+
+      - name: CDK Deploy
+        id: deploy
+        working-directory: infrastructure/aws-cdk
+        run: |
+          pnpm cdk deploy ccp-config-api-staging --require-approval=never --outputs-file outputs.json
+          
+          # Extract outputs
+          CONFIG_API_URL=$(cat outputs.json | jq -r '.["ccp-config-api-staging"].ConfigApiUrl')
+          CONFIG_TABLE_NAME=$(cat outputs.json | jq -r '.["ccp-config-api-staging"].ConfigTableName')
+          
+          echo "config-api-url=$CONFIG_API_URL" >> $GITHUB_OUTPUT
+          echo "config-table-name=$CONFIG_TABLE_NAME" >> $GITHUB_OUTPUT
+        env:
+          CDK_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+          CDK_DEFAULT_REGION: ${{ env.AWS_REGION }}
+
+  # Deploy CCP Admin Dashboard
+  deploy-admin:
+    name: Deploy Admin Dashboard
+    runs-on: ubuntu-latest
+    needs: [build-apps, deploy-infrastructure]
+    if: always() && (needs.build-apps.result == 'success' || needs.build-apps.result == 'skipped')
+    environment: staging
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Download build artifacts
+        if: needs.build-apps.result == 'success'
+        uses: actions/download-artifact@v3
+        with:
+          name: ccp-admin-staging-build
+          path: apps/ccp-admin/dist
+
+      - name: Deploy to S3
+        run: |
+          # Create S3 bucket if it doesn't exist
+          aws s3 mb s3://ccp-admin-staging-${{ secrets.AWS_ACCOUNT_ID }} --region ${{ env.AWS_REGION }} || true
+          
+          # Sync files to S3
+          aws s3 sync apps/ccp-admin/dist s3://ccp-admin-staging-${{ secrets.AWS_ACCOUNT_ID }} --delete
+          
+          # Configure bucket for static website hosting
+          aws s3 website s3://ccp-admin-staging-${{ secrets.AWS_ACCOUNT_ID }} --index-document index.html --error-document index.html
+
+      - name: Invalidate CloudFront
+        run: |
+          # Get CloudFront distribution ID (if exists)
+          DISTRIBUTION_ID=$(aws cloudfront list-distributions --query 'DistributionList.Items[?Origins.Items[0].DomainName==`ccp-admin-staging-${{ secrets.AWS_ACCOUNT_ID }}.s3.amazonaws.com`].Id' --output text)
+          
+          if [ ! -z "$DISTRIBUTION_ID" ] && [ "$DISTRIBUTION_ID" != "None" ]; then
+            aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/*"
+          fi
+
+      - name: Update environment URLs
+        run: |
+          echo "Admin Dashboard URL: http://ccp-admin-staging-${{ secrets.AWS_ACCOUNT_ID }}.s3-website-${{ env.AWS_REGION }}.amazonaws.com"
+          echo "Config API URL: ${{ needs.deploy-infrastructure.outputs.config-api-url }}"
+
+  # Deploy CCP Client Application
+  deploy-client:
+    name: Deploy Client Application
+    runs-on: ubuntu-latest
+    needs: [build-apps, deploy-infrastructure]
+    if: always() && (needs.build-apps.result == 'success' || needs.build-apps.result == 'skipped')
+    environment: staging
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Download build artifacts
+        if: needs.build-apps.result == 'success'
+        uses: actions/download-artifact@v3
+        with:
+          name: ccp-client-staging-build
+          path: apps/ccp-client/dist
+
+      - name: Deploy to S3
+        run: |
+          # Create S3 bucket if it doesn't exist
+          aws s3 mb s3://ccp-client-staging-${{ secrets.AWS_ACCOUNT_ID }} --region ${{ env.AWS_REGION }} || true
+          
+          # Sync files to S3
+          aws s3 sync apps/ccp-client/dist s3://ccp-client-staging-${{ secrets.AWS_ACCOUNT_ID }} --delete
+          
+          # Configure bucket for static website hosting
+          aws s3 website s3://ccp-client-staging-${{ secrets.AWS_ACCOUNT_ID }} --index-document index.html --error-document index.html
+
+  # Run smoke tests
+  smoke-tests:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    needs: [deploy-admin, deploy-infrastructure]
+    if: always() && needs.deploy-admin.result == 'success'
+    environment: staging
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run smoke tests
+        run: |
+          # Test Admin Dashboard
+          ADMIN_URL="http://ccp-admin-staging-${{ secrets.AWS_ACCOUNT_ID }}.s3-website-${{ env.AWS_REGION }}.amazonaws.com"
+          curl -f $ADMIN_URL || exit 1
+          
+          # Test Config API
+          CONFIG_API_URL="${{ needs.deploy-infrastructure.outputs.config-api-url }}"
+          if [ ! -z "$CONFIG_API_URL" ]; then
+            curl -f "$CONFIG_API_URL/health" || exit 1
+          fi
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+
+      - name: Run API integration tests
+        if: needs.deploy-infrastructure.outputs.config-api-url != ''
+        run: |
+          # Run basic API tests
+          pnpm nx test:integration config --testPathPattern=smoke
+        env:
+          API_BASE_URL: ${{ needs.deploy-infrastructure.outputs.config-api-url }}
+
+  # Security scan
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: [deploy-admin, deploy-infrastructure]
+    if: always() && needs.deploy-admin.result == 'success'
+    environment: staging
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run OWASP ZAP scan
+        uses: zaproxy/action-full-scan@v0.7.0
+        with:
+          target: 'http://ccp-admin-staging-${{ secrets.AWS_ACCOUNT_ID }}.s3-website-${{ env.AWS_REGION }}.amazonaws.com'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a'
+
+  # Notification
+  notify:
+    name: Notify Deployment
+    runs-on: ubuntu-latest
+    needs: [deploy-admin, deploy-client, deploy-infrastructure, smoke-tests]
+    if: always()
+    steps:
+      - name: Notify Slack on success
+        if: success()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          channel: '#ccp-deployments'
+          text: |
+            ✅ Staging deployment completed successfully!
+            
+            🎯 **Admin Dashboard**: http://ccp-admin-staging-${{ secrets.AWS_ACCOUNT_ID }}.s3-website-${{ env.AWS_REGION }}.amazonaws.com
+            🔌 **Config API**: ${{ needs.deploy-infrastructure.outputs.config-api-url }}
+            🗄️ **Database**: ${{ needs.deploy-infrastructure.outputs.config-table-name }}
+            
+            📝 **Commit**: ${{ github.sha }}
+            👤 **Author**: ${{ github.actor }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify Slack on failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          channel: '#ccp-alerts'
+          text: |
+            ❌ Staging deployment failed!
+            
+            📝 **Commit**: ${{ github.sha }}
+            👤 **Author**: ${{ github.actor }}
+            🔗 **Workflow**: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

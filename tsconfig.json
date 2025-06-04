@@ -1,0 +1,34 @@
+{
+  "extends": "./tsconfig.base.json",
+  "files": [],
+  "include": [],
+  "references": [
+    {
+      "path": "./apps/ccp-client"
+    },
+    {
+      "path": "./apps/ccp-admin"
+    },
+    {
+      "path": "./apps/ccp-docs"
+    },
+    {
+      "path": "./libs/core"
+    },
+    {
+      "path": "./libs/ui-components"
+    },
+    {
+      "path": "./libs/config"
+    },
+    {
+      "path": "./libs/logging"
+    },
+    {
+      "path": "./libs/testing"
+    },
+    {
+      "path": "./libs/types"
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+coverage/
+.nx/
+
+# Configuration files
+*.min.js
+*.min.css
+*.bundle.js
+
+# Generated files
+.generated/
+auto-generated/
+
+# Documentation
+CHANGELOG.md
+LICENSE
+
+# Infrastructure
+infrastructure/
+*.tf
+*.tfstate
+*.tfplan
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db

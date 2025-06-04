@@ -1,0 +1,202 @@
+version: 2
+updates:
+  # Enable version updates for npm dependencies
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "ccp-team"
+    assignees:
+      - "ccp-team"
+    commit-message:
+      prefix: "chore"
+      prefix-development: "chore"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "automated"
+    allow:
+      - dependency-type: "direct"
+      - dependency-type: "indirect"
+    ignore:
+      # Ignore major version updates for core dependencies
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+
+  # Enable version updates for npm dependencies in apps
+  - package-ecosystem: "npm"
+    directory: "/apps/ccp-admin"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:30"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "ccp-team"
+    commit-message:
+      prefix: "chore(admin)"
+    labels:
+      - "dependencies"
+      - "ccp-admin"
+
+  - package-ecosystem: "npm"
+    directory: "/apps/ccp-client"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "10:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "ccp-team"
+    commit-message:
+      prefix: "chore(client)"
+    labels:
+      - "dependencies"
+      - "ccp-client"
+
+  - package-ecosystem: "npm"
+    directory: "/apps/ccp-docs"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "10:30"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "ccp-team"
+    commit-message:
+      prefix: "chore(docs)"
+    labels:
+      - "dependencies"
+      - "ccp-docs"
+
+  # Enable version updates for npm dependencies in libs
+  - package-ecosystem: "npm"
+    directory: "/libs/core"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "09:00"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "ccp-team"
+    commit-message:
+      prefix: "chore(core)"
+    labels:
+      - "dependencies"
+      - "core-lib"
+
+  - package-ecosystem: "npm"
+    directory: "/libs/config"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "09:30"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "ccp-team"
+    commit-message:
+      prefix: "chore(config)"
+    labels:
+      - "dependencies"
+      - "config-lib"
+
+  - package-ecosystem: "npm"
+    directory: "/libs/logging"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "10:00"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "ccp-team"
+    commit-message:
+      prefix: "chore(logging)"
+    labels:
+      - "dependencies"
+      - "logging-lib"
+
+  - package-ecosystem: "npm"
+    directory: "/libs/types"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "10:30"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "ccp-team"
+    commit-message:
+      prefix: "chore(types)"
+    labels:
+      - "dependencies"
+      - "types-lib"
+
+  # Enable version updates for infrastructure dependencies
+  - package-ecosystem: "npm"
+    directory: "/infrastructure/aws-cdk"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "ccp-team"
+      - "infrastructure-team"
+    commit-message:
+      prefix: "chore(infra)"
+    labels:
+      - "dependencies"
+      - "infrastructure"
+      - "aws-cdk"
+    ignore:
+      # Be more conservative with CDK updates
+      - dependency-name: "aws-cdk-lib"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "aws-cdk"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "npm"
+    directory: "/infrastructure/lambda/config-api"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "09:30"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "ccp-team"
+      - "backend-team"
+    commit-message:
+      prefix: "chore(lambda)"
+    labels:
+      - "dependencies"
+      - "lambda"
+      - "config-api"
+
+  # Enable version updates for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "thursday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "ccp-team"
+      - "devops-team"
+    commit-message:
+      prefix: "chore(ci)"
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "ci-cd"

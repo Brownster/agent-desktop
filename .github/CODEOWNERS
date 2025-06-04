@@ -1,0 +1,96 @@
+# Global code owners
+* @ccp-team
+
+# Core libraries - require approval from core team
+/libs/core/ @ccp-team @core-maintainers
+/libs/types/ @ccp-team @core-maintainers
+
+# Configuration library - require approval from config team
+/libs/config/ @ccp-team @config-maintainers
+
+# Logging library - require approval from platform team
+/libs/logging/ @ccp-team @platform-maintainers
+
+# Applications
+/apps/ccp-admin/ @ccp-team @frontend-team
+/apps/ccp-client/ @ccp-team @frontend-team
+/apps/ccp-docs/ @ccp-team @docs-team
+
+# Infrastructure - require approval from infrastructure team
+/infrastructure/ @ccp-team @infrastructure-team
+/infrastructure/aws-cdk/ @ccp-team @infrastructure-team @aws-specialists
+/infrastructure/lambda/ @ccp-team @backend-team
+/infrastructure/terraform/ @ccp-team @infrastructure-team @terraform-specialists
+/infrastructure/docker/ @ccp-team @devops-team
+
+# CI/CD workflows - require approval from DevOps team
+/.github/workflows/ @ccp-team @devops-team
+/.github/dependabot.yml @ccp-team @devops-team
+
+# Security-sensitive files - require approval from security team
+/SECURITY.md @ccp-team @security-team
+/.github/workflows/security.yml @ccp-team @security-team
+
+# Documentation - docs team can approve
+/docs/ @ccp-team @docs-team
+/README.md @ccp-team @docs-team
+/**/README.md @ccp-team @docs-team
+
+# Configuration files - require core team approval
+/package.json @ccp-team @core-maintainers
+/tsconfig.base.json @ccp-team @core-maintainers
+/nx.json @ccp-team @core-maintainers
+/pnpm-workspace.yaml @ccp-team @core-maintainers
+/.nvmrc @ccp-team @core-maintainers
+
+# Project management and development guidelines
+/CLAUDE.md @ccp-team @core-maintainers
+/.roadmap/ @ccp-team @product-managers
+
+# Specific high-impact files that need extra review
+/apps/ccp-admin/src/App.tsx @ccp-team @frontend-team @tech-leads
+/apps/ccp-client/src/App.tsx @ccp-team @frontend-team @tech-leads
+/libs/core/src/module-registry.ts @ccp-team @core-maintainers @tech-leads
+/libs/config/src/config.service.ts @ccp-team @config-maintainers @tech-leads
+
+# AWS-specific files need AWS specialists
+**/cdk.json @ccp-team @infrastructure-team @aws-specialists
+**/aws-*.yml @ccp-team @infrastructure-team @aws-specialists
+**/*cloudformation* @ccp-team @infrastructure-team @aws-specialists
+
+# Lambda functions need backend team approval
+/infrastructure/lambda/**/*.ts @ccp-team @backend-team
+/infrastructure/lambda/**/*.js @ccp-team @backend-team
+/infrastructure/lambda/**/package.json @ccp-team @backend-team
+
+# Database and data-related changes
+**/*dynamo* @ccp-team @backend-team @data-team
+**/*database* @ccp-team @backend-team @data-team
+**/*migration* @ccp-team @backend-team @data-team
+
+# Performance-critical files
+**/*performance* @ccp-team @performance-team
+**/*optimization* @ccp-team @performance-team
+**/vite.config.ts @ccp-team @frontend-team @performance-team
+**/webpack.config.js @ccp-team @frontend-team @performance-team
+
+# Testing files - QA team should be involved
+**/*.test.ts @ccp-team @qa-team
+**/*.test.tsx @ccp-team @qa-team
+**/*.spec.ts @ccp-team @qa-team
+**/*.spec.tsx @ccp-team @qa-team
+**/jest.config.ts @ccp-team @qa-team
+**/playwright.config.ts @ccp-team @qa-team
+**/*e2e* @ccp-team @qa-team
+
+# Security scanning and audit files
+**/.snyk @ccp-team @security-team
+**/sonar-project.properties @ccp-team @security-team
+**/*security* @ccp-team @security-team
+**/*audit* @ccp-team @security-team
+
+# Monitoring and observability
+**/*monitoring* @ccp-team @platform-maintainers @sre-team
+**/*observability* @ccp-team @platform-maintainers @sre-team
+**/*metrics* @ccp-team @platform-maintainers @sre-team
+**/*logging* @ccp-team @platform-maintainers @sre-team

@@ -1,0 +1,499 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag to deploy'
+        required: true
+        type: string
+      skip_tests:
+        description: 'Skip pre-deployment tests'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  NODE_VERSION: '20.x'
+  PNPM_VERSION: '8.x'
+  AWS_REGION: 'us-east-1'
+
+jobs:
+  # Pre-deployment validation
+  pre-deployment:
+    name: Pre-deployment Validation
+    runs-on: ubuntu-latest
+    environment: production
+    outputs:
+      should-deploy: ${{ steps.validate.outputs.should-deploy }}
+      version: ${{ steps.validate.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate deployment
+        id: validate
+        run: |
+          # Determine version
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION="${{ github.ref_name }}"
+          else
+            VERSION="main-$(git rev-parse --short HEAD)"
+          fi
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          # Check if this is a production-ready commit
+          if [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || [ "${{ github.event.inputs.skip_tests }}" = "true" ]; then
+            echo "should-deploy=true" >> $GITHUB_OUTPUT
+          else
+            echo "should-deploy=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Not a tagged release. Skipping production deployment."
+          fi
+
+  # Build applications for production
+  build-production:
+    name: Build for Production
+    runs-on: ubuntu-latest
+    needs: [pre-deployment]
+    if: needs.pre-deployment.outputs.should-deploy == 'true'
+    environment: production
+    strategy:
+      matrix:
+        app: [ccp-admin, ccp-client, ccp-docs]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run final tests
+        if: github.event.inputs.skip_tests != 'true'
+        run: |
+          pnpm nx test ${{ matrix.app }}
+          pnpm nx lint ${{ matrix.app }}
+          pnpm nx type-check ${{ matrix.app }}
+
+      - name: Build ${{ matrix.app }} for production
+        run: pnpm nx build ${{ matrix.app }}
+        env:
+          VITE_ENVIRONMENT: production
+          VITE_API_BASE_URL: ${{ secrets.PRODUCTION_API_BASE_URL }}
+          VITE_WS_ENDPOINT: ${{ secrets.PRODUCTION_WS_ENDPOINT }}
+          VITE_ENABLE_ANALYTICS: true
+          VITE_ENABLE_DEBUG: false
+
+      - name: Optimize build
+        run: |
+          # Additional optimizations for production
+          cd apps/${{ matrix.app }}/dist
+          
+          # Compress assets
+          find . -name "*.js" -exec gzip -9 -c {} \; > {}.gz
+          find . -name "*.css" -exec gzip -9 -c {} \; > {}.gz
+          find . -name "*.html" -exec gzip -9 -c {} \; > {}.gz
+
+      - name: Upload production build
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.app }}-production-build
+          path: apps/${{ matrix.app }}/dist
+          retention-days: 30
+
+  # Deploy infrastructure to production
+  deploy-infrastructure-prod:
+    name: Deploy Production Infrastructure
+    runs-on: ubuntu-latest
+    needs: [pre-deployment]
+    if: needs.pre-deployment.outputs.should-deploy == 'true'
+    environment: production
+    outputs:
+      config-api-url: ${{ steps.deploy.outputs.config-api-url }}
+      config-table-name: ${{ steps.deploy.outputs.config-table-name }}
+      cloudfront-admin-url: ${{ steps.deploy.outputs.cloudfront-admin-url }}
+      cloudfront-client-url: ${{ steps.deploy.outputs.cloudfront-client-url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install CDK dependencies
+        working-directory: infrastructure/aws-cdk
+        run: pnpm install
+
+      - name: Build Lambda function
+        working-directory: infrastructure/lambda/config-api
+        run: |
+          pnpm install
+          pnpm run build
+
+      - name: CDK Bootstrap (if needed)
+        working-directory: infrastructure/aws-cdk
+        run: |
+          pnpm cdk bootstrap aws://${{ secrets.AWS_ACCOUNT_ID }}/${{ env.AWS_REGION }} || true
+
+      - name: CDK Deploy Production
+        id: deploy
+        working-directory: infrastructure/aws-cdk
+        run: |
+          # Deploy with production context
+          pnpm cdk deploy ccp-config-api-production \
+            --context environment=production \
+            --context terminationProtection=true \
+            --require-approval=never \
+            --outputs-file outputs.json
+          
+          # Extract outputs
+          CONFIG_API_URL=$(cat outputs.json | jq -r '.["ccp-config-api-production"].ConfigApiUrl')
+          CONFIG_TABLE_NAME=$(cat outputs.json | jq -r '.["ccp-config-api-production"].ConfigTableName')
+          
+          echo "config-api-url=$CONFIG_API_URL" >> $GITHUB_OUTPUT
+          echo "config-table-name=$CONFIG_TABLE_NAME" >> $GITHUB_OUTPUT
+        env:
+          CDK_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+          CDK_DEFAULT_REGION: ${{ env.AWS_REGION }}
+
+  # Deploy Admin Dashboard to production
+  deploy-admin-prod:
+    name: Deploy Admin Dashboard (Production)
+    runs-on: ubuntu-latest
+    needs: [build-production, deploy-infrastructure-prod]
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Download production build
+        uses: actions/download-artifact@v3
+        with:
+          name: ccp-admin-production-build
+          path: apps/ccp-admin/dist
+
+      - name: Deploy to S3 with versioning
+        run: |
+          BUCKET_NAME="ccp-admin-production-${{ secrets.AWS_ACCOUNT_ID }}"
+          VERSION="${{ needs.pre-deployment.outputs.version }}"
+          
+          # Create bucket if it doesn't exist
+          aws s3 mb s3://$BUCKET_NAME --region ${{ env.AWS_REGION }} || true
+          
+          # Enable versioning
+          aws s3api put-bucket-versioning --bucket $BUCKET_NAME --versioning-configuration Status=Enabled
+          
+          # Create backup of current version
+          aws s3 sync s3://$BUCKET_NAME s3://$BUCKET_NAME-backup-$(date +%Y%m%d-%H%M%S) || true
+          
+          # Deploy new version
+          aws s3 sync apps/ccp-admin/dist s3://$BUCKET_NAME --delete \
+            --metadata version=$VERSION \
+            --cache-control "public, max-age=86400" \
+            --exclude "*.html" \
+            --exclude "*.map"
+          
+          # Deploy HTML files with shorter cache
+          aws s3 sync apps/ccp-admin/dist s3://$BUCKET_NAME \
+            --exclude "*" \
+            --include "*.html" \
+            --cache-control "public, max-age=3600, must-revalidate"
+          
+          # Configure bucket for static website hosting
+          aws s3 website s3://$BUCKET_NAME --index-document index.html --error-document index.html
+
+      - name: Create/Update CloudFront distribution
+        id: cloudfront
+        run: |
+          BUCKET_NAME="ccp-admin-production-${{ secrets.AWS_ACCOUNT_ID }}"
+          DOMAIN_NAME="$BUCKET_NAME.s3.amazonaws.com"
+          
+          # Check if distribution exists
+          DISTRIBUTION_ID=$(aws cloudfront list-distributions --query "DistributionList.Items[?Origins.Items[0].DomainName=='$DOMAIN_NAME'].Id" --output text)
+          
+          if [ -z "$DISTRIBUTION_ID" ] || [ "$DISTRIBUTION_ID" = "None" ]; then
+            echo "Creating new CloudFront distribution..."
+            
+            # Create distribution config
+            cat > cloudfront-config.json << EOF
+          {
+            "CallerReference": "ccp-admin-production-$(date +%s)",
+            "Comment": "CCP Admin Dashboard Production",
+            "DefaultCacheBehavior": {
+              "TargetOriginId": "S3Origin",
+              "ViewerProtocolPolicy": "redirect-to-https",
+              "TrustedSigners": {
+                "Enabled": false,
+                "Quantity": 0
+              },
+              "ForwardedValues": {
+                "QueryString": false,
+                "Cookies": {"Forward": "none"}
+              },
+              "MinTTL": 0,
+              "DefaultTTL": 86400,
+              "MaxTTL": 31536000
+            },
+            "Origins": {
+              "Quantity": 1,
+              "Items": [
+                {
+                  "Id": "S3Origin",
+                  "DomainName": "$DOMAIN_NAME",
+                  "S3OriginConfig": {
+                    "OriginAccessIdentity": ""
+                  }
+                }
+              ]
+            },
+            "Enabled": true,
+            "PriceClass": "PriceClass_100"
+          }
+          EOF
+            
+            DISTRIBUTION_ID=$(aws cloudfront create-distribution --distribution-config file://cloudfront-config.json --query 'Distribution.Id' --output text)
+            echo "Created distribution: $DISTRIBUTION_ID"
+          fi
+          
+          # Get distribution domain name
+          DISTRIBUTION_DOMAIN=$(aws cloudfront get-distribution --id $DISTRIBUTION_ID --query 'Distribution.DomainName' --output text)
+          
+          # Invalidate cache
+          aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/*"
+          
+          echo "cloudfront-admin-url=https://$DISTRIBUTION_DOMAIN" >> $GITHUB_OUTPUT
+
+  # Deploy Client Application to production
+  deploy-client-prod:
+    name: Deploy Client Application (Production)
+    runs-on: ubuntu-latest
+    needs: [build-production, deploy-infrastructure-prod]
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Download production build
+        uses: actions/download-artifact@v3
+        with:
+          name: ccp-client-production-build
+          path: apps/ccp-client/dist
+
+      - name: Deploy to S3 with CDN
+        run: |
+          BUCKET_NAME="ccp-client-production-${{ secrets.AWS_ACCOUNT_ID }}"
+          VERSION="${{ needs.pre-deployment.outputs.version }}"
+          
+          # Create bucket and deploy similar to admin dashboard
+          aws s3 mb s3://$BUCKET_NAME --region ${{ env.AWS_REGION }} || true
+          aws s3api put-bucket-versioning --bucket $BUCKET_NAME --versioning-configuration Status=Enabled
+          
+          # Backup and deploy
+          aws s3 sync s3://$BUCKET_NAME s3://$BUCKET_NAME-backup-$(date +%Y%m%d-%H%M%S) || true
+          aws s3 sync apps/ccp-client/dist s3://$BUCKET_NAME --delete --metadata version=$VERSION
+
+  # Production health checks
+  health-checks:
+    name: Production Health Checks
+    runs-on: ubuntu-latest
+    needs: [deploy-admin-prod, deploy-client-prod, deploy-infrastructure-prod]
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Wait for deployments to propagate
+        run: sleep 30
+
+      - name: Health check - Config API
+        run: |
+          CONFIG_API_URL="${{ needs.deploy-infrastructure-prod.outputs.config-api-url }}"
+          
+          # Test health endpoint
+          response=$(curl -s -o /dev/null -w "%{http_code}" "$CONFIG_API_URL/health")
+          if [ "$response" != "200" ]; then
+            echo "Config API health check failed: $response"
+            exit 1
+          fi
+          
+          echo "✅ Config API health check passed"
+
+      - name: Health check - Admin Dashboard
+        run: |
+          ADMIN_URL="${{ needs.deploy-infrastructure-prod.outputs.cloudfront-admin-url }}"
+          
+          if [ ! -z "$ADMIN_URL" ]; then
+            response=$(curl -s -o /dev/null -w "%{http_code}" "$ADMIN_URL")
+            if [ "$response" != "200" ]; then
+              echo "Admin Dashboard health check failed: $response"
+              exit 1
+            fi
+            echo "✅ Admin Dashboard health check passed"
+          fi
+
+      - name: Run production smoke tests
+        run: |
+          # Run comprehensive production tests
+          pnpm nx test:e2e:production ccp-admin --baseUrl="${{ needs.deploy-infrastructure-prod.outputs.cloudfront-admin-url }}"
+        env:
+          API_BASE_URL: ${{ needs.deploy-infrastructure-prod.outputs.config-api-url }}
+
+  # Create GitHub release
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [health-checks, pre-deployment]
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Generate changelog since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+          
+          if [ -z "$LAST_TAG" ]; then
+            CHANGES=$(git log --pretty=format:"- %s" --since="1 month ago")
+          else
+            CHANGES=$(git log --pretty=format:"- %s" $LAST_TAG..HEAD)
+          fi
+          
+          echo "changes<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          body: |
+            ## What's Changed
+            
+            ${{ steps.changelog.outputs.changes }}
+            
+            ## Deployment URLs
+            
+            - **Admin Dashboard**: ${{ needs.deploy-infrastructure-prod.outputs.cloudfront-admin-url }}
+            - **Config API**: ${{ needs.deploy-infrastructure-prod.outputs.config-api-url }}
+            
+            ## Infrastructure
+            
+            - **Config Table**: ${{ needs.deploy-infrastructure-prod.outputs.config-table-name }}
+            - **AWS Region**: ${{ env.AWS_REGION }}
+            
+            Full deployment completed at $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          draft: false
+          prerelease: false
+
+  # Final notification
+  notify-production:
+    name: Notify Production Deployment
+    runs-on: ubuntu-latest
+    needs: [health-checks, deploy-infrastructure-prod, pre-deployment]
+    if: always()
+    steps:
+      - name: Notify Slack on success
+        if: success()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          channel: '#ccp-production'
+          text: |
+            🚀 **PRODUCTION DEPLOYMENT SUCCESSFUL** 🚀
+            
+            **Version**: ${{ needs.pre-deployment.outputs.version }}
+            **Admin Dashboard**: ${{ needs.deploy-infrastructure-prod.outputs.cloudfront-admin-url }}
+            **Config API**: ${{ needs.deploy-infrastructure-prod.outputs.config-api-url }}
+            
+            **Commit**: ${{ github.sha }}
+            **Author**: ${{ github.actor }}
+            **Timestamp**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+            
+            All health checks passed ✅
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify Slack on failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          channel: '#ccp-alerts'
+          text: |
+            🚨 **PRODUCTION DEPLOYMENT FAILED** 🚨
+            
+            **Version**: ${{ needs.pre-deployment.outputs.version }}
+            **Commit**: ${{ github.sha }}
+            **Author**: ${{ github.actor }}
+            **Workflow**: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            
+            @channel Please investigate immediately!
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
