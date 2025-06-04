@@ -39,6 +39,7 @@ export type {
   CustomerTenant,
   TenantLimits,
   TenantUsage,
+  AudioConfiguration,
 } from './app/customer.types';
 export * from './app/deployment.types';
 export * from './app/integration.types';

@@ -6,6 +6,16 @@
 import type { ModuleConfig, Environment } from '../core/config.types';
 
 /**
+ * Audio configuration for controlling softphone behavior
+ */
+export interface AudioConfiguration {
+  readonly mode: 'local' | 'mobile_browser' | 'vdi';
+  readonly vdiOptions?: {
+    readonly platformHint?: 'citrix' | 'vmware' | 'workspaces' | 'generic';
+  };
+}
+
+/**
  * Customer configuration schema
  */
 export interface CustomerConfig {
@@ -19,6 +29,7 @@ export interface CustomerConfig {
   readonly deployment: DeploymentConfig;
   readonly security: SecurityConfig;
   readonly vdi: VDIConfig;
+  readonly audioConfiguration: AudioConfiguration;
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly version: string;

@@ -19,6 +19,7 @@ A modern, modular Contact Control Panel (CCP) desktop application for Amazon Con
 
 ### Enterprise Features
 - **VDI Optimization**: Optimized for Citrix, VMware Horizon, AWS WorkSpaces
+- **Flexible Audio Modes**: Local, mobile browser, and VDI audio paths
 - **Modular Architecture**: Customer-specific feature enablement
 - **Multi-tenant Support**: Customer-specific configurations and branding
 - **Advanced Security**: CSP, CORS, IAM integration
