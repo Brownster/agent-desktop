@@ -49,10 +49,13 @@ export class ConfigValidator {
   /**
    * Validate customer configuration
    * 
-   * @param config - Customer configuration to validate
+   * Validate configuration against a schema or a named schema
+   *
+   * @param config - Configuration to validate
+   * @param schemaOrName - Name of the schema or the schema object itself
    * @returns Validation result with errors and warnings
    */
-  validateCustomerConfig(config: unknown): ConfigValidationResult {
+  validate(config: unknown, schemaOrName: string | ValidationSchema): ConfigValidationResult {
     const errors: ConfigValidationError[] = [];
     const warnings: ConfigValidationWarning[] = [];
 
@@ -63,19 +66,33 @@ export class ConfigValidator {
         code: 'INVALID_TYPE',
         severity: 'error',
       });
-      
       return { isValid: false, errors, warnings };
     }
 
-    const customerConfig = config as Record<string, unknown>;
-    const schema = this.schemas.get('CustomerConfig');
-    
-    if (schema) {
-      this.validateAgainstSchema(customerConfig, schema, '', errors, warnings);
+    let schema: ValidationSchema | undefined;
+    let schemaDisplayName: string;
+
+    if (typeof schemaOrName === 'string') {
+      schema = this.schemas.get(schemaOrName);
+      schemaDisplayName = schemaOrName;
+      if (!schema) {
+        errors.push({
+          field: 'root',
+          message: `Schema '${schemaOrName}' not found`,
+          code: 'SCHEMA_NOT_FOUND',
+          severity: 'error',
+        });
+        return { isValid: false, errors, warnings };
+      }
+    } else {
+      schema = schemaOrName;
+      // For direct schema objects, we don't have a readily available "name"
+      // unless we add a 'name' property to ValidationSchema, or generate one.
+      // For now, using a generic placeholder.
+      schemaDisplayName = '[Direct Schema Object]';
     }
 
-    // Additional business rule validations
-    this.validateBusinessRules(customerConfig, errors, warnings);
+    this.validateAgainstSchema(config as Record<string, unknown>, schema, '', errors, warnings);
 
     return {
       isValid: errors.length === 0,
@@ -85,38 +102,41 @@ export class ConfigValidator {
   }
 
   /**
+   * Validate customer configuration including business rules
+   *
+   * @param config - Customer configuration to validate
+   * @returns Validation result with errors and warnings
+   */
+  validateCustomerConfig(config: unknown): ConfigValidationResult {
+    const validationResult = this.validate(config, 'CustomerConfig');
+
+    // If schema validation fails, return immediately
+    if (!validationResult.isValid) {
+      return validationResult;
+    }
+
+    // Additional business rule validations for CustomerConfig
+    // Ensure config is an object, though `validate` should have caught it if not.
+    // This is more of a type assertion for TypeScript.
+    if (config && typeof config === 'object') {
+      this.validateBusinessRules(config as Record<string, unknown>, validationResult.errors, validationResult.warnings);
+    }
+
+    // Update isValid based on business rule validation results
+    validationResult.isValid = validationResult.errors.length === 0;
+
+    return validationResult;
+  }
+
+  /**
    * Validate module configuration
-   * 
+   *
    * @param config - Module configuration to validate
    * @returns Validation result
    */
   validateModuleConfig(config: unknown): ConfigValidationResult {
-    const errors: ConfigValidationError[] = [];
-    const warnings: ConfigValidationWarning[] = [];
-
-    if (!config || typeof config !== 'object') {
-      errors.push({
-        field: 'root',
-        message: 'Module configuration must be an object',
-        code: 'INVALID_TYPE',
-        severity: 'error',
-      });
-      
-      return { isValid: false, errors, warnings };
-    }
-
-    const moduleConfig = config as Record<string, unknown>;
-    const schema = this.schemas.get('ModuleConfig');
-    
-    if (schema) {
-      this.validateAgainstSchema(moduleConfig, schema, '', errors, warnings);
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-      warnings,
-    };
+    // Simply call the generic validate method with the 'ModuleConfig' schema
+    return this.validate(config, 'ModuleConfig');
   }
 
   /**
@@ -365,9 +385,23 @@ export class ConfigValidator {
   }
 
   /**
-   * Validate object against schema
+   * Validate object against schema (entry point)
    */
   private validateAgainstSchema(
+    obj: Record<string, unknown>,
+    schema: ValidationSchema,
+    path: string,
+    errors: ConfigValidationError[],
+    warnings: ConfigValidationWarning[]
+  ): void {
+    // Call the core recursive validation logic
+    this.validateObjectAgainstSchema(obj, schema, path, errors, warnings);
+  }
+
+  /**
+   * Core logic to validate an object against a schema, recursively.
+   */
+  private validateObjectAgainstSchema(
     obj: Record<string, unknown>,
     schema: ValidationSchema,
     path: string,
@@ -407,7 +441,9 @@ export class ConfigValidator {
         }
       }
     } else {
-      // Validate the object itself
+      // This case handles when the schema itself is not for an 'object' with 'properties',
+      // but the value is expected to be an object (e.g. schema type: 'object' without properties).
+      // Or if it's a non-object schema being applied to a top-level non-object (less common for root).
       this.validateValue(obj, schema, path, errors, warnings);
     }
   }
@@ -591,9 +627,14 @@ export class ConfigValidator {
     errors: ConfigValidationError[],
     warnings: ConfigValidationWarning[]
   ): void {
+    // When validating a nested object, call the recursive validation function.
+    // This ensures that 'properties' of the nested object's schema are checked.
     if (schema.properties) {
-      this.validateAgainstSchema(value, schema, path, errors, warnings);
+      this.validateObjectAgainstSchema(value, schema, path, errors, warnings);
     }
+    // If schema.properties is not defined for an object type,
+    // it implies any object is valid, or custom validation will handle it.
+    // Basic type check is done in validateValue.
   }
 
   /**

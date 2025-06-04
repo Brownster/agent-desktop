@@ -25,15 +25,31 @@ export interface IConfigStore {
 }
 
 /**
- * DynamoDB configuration store
+ * DynamoDB configuration store.
+ *
+ * // TODO: AWS SDK INTEGRATION
+ * // This is currently a MOCK implementation.
+ * // Replace mock logic with actual AWS SDK calls for DynamoDB operations.
+ * // Ensure appropriate error handling, retry mechanisms, and IAM permissions.
  */
 export class DynamoDBConfigStore implements IConfigStore {
   private readonly tableName: string;
   private readonly logger: Logger;
   
-  constructor(tableName: string, logger: Logger) {
+  constructor(tableName: string, logger?: Logger) {
     this.tableName = tableName;
-    this.logger = logger.createChild('DynamoDBConfigStore');
+    if (logger) {
+      this.logger = logger.createChild('DynamoDBConfigStore');
+    } else {
+      // Fallback logger
+      this.logger = {
+        debug: (message, context) => console.debug(`[DynamoDBConfigStore] ${message}`, context || ''),
+        info: (message, context) => console.info(`[DynamoDBConfigStore] ${message}`, context || ''),
+        warn: (message, context) => console.warn(`[DynamoDBConfigStore] ${message}`, context || ''),
+        error: (message, context) => console.error(`[DynamoDBConfigStore] ${message}`, context || ''),
+        createChild: () => this.logger, // Simplistic child creation
+      } as Logger;
+    }
   }
 
   /**
@@ -42,16 +58,30 @@ export class DynamoDBConfigStore implements IConfigStore {
   async getCustomerConfig(customerId: string): Promise<Result<CustomerConfig, Error>> {
     this.logger.info('Getting customer configuration', { customerId });
 
-    try {
-      // Mock implementation - in real implementation, use AWS SDK
-      const mockConfig = this.createMockCustomerConfig(customerId);
-      
-      this.logger.info('Customer configuration retrieved successfully', {
-        customerId,
-        moduleCount: mockConfig.modules.length,
-      });
+    // TODO: AWS SDK - Replace with actual DynamoDB getItem call
+    // Example:
+    // const dynamodb = new AWS.DynamoDB.DocumentClient();
+    // const params = {
+    //   TableName: this.tableName,
+    //   Key: { PK: `CUSTOMER#\${customerId}`, SK: 'CONFIG' },
+    // };
+    // const result = await dynamodb.get(params).promise();
+    // if (!result.Item) return failure(new Error('Customer configuration not found'));
+    // return success(result.Item as CustomerConfig);
 
-      return success(mockConfig);
+    try {
+      // Mock implementation - Placeholder for actual AWS SDK call
+      this.logger.warn('Mock implementation: Returning dummy data for getCustomerConfig', { customerId });
+      // const mockConfig = this.createMockCustomerConfig(customerId); // createMockCustomerConfig will be removed
+      // For now, to keep it compiling without the method, let's return a very basic mock or error
+      return failure(new Error(`Mock for getCustomerConfig for ${customerId} - needs AWS SDK implementation.`));
+      
+      // this.logger.info('Customer configuration retrieved successfully', {
+      //   customerId,
+      //   moduleCount: mockConfig.modules.length,
+      // });
+
+      // return success(mockConfig);
     } catch (error) {
       this.logger.error('Failed to get customer configuration', {
         customerId,
@@ -71,21 +101,23 @@ export class DynamoDBConfigStore implements IConfigStore {
       version: config.version,
     });
 
-    try {
-      // Mock implementation - in real implementation, use AWS SDK
-      // const dynamodb = new AWS.DynamoDB.DocumentClient();
-      // const params = {
-      //   TableName: this.tableName,
-      //   Item: {
-      //     PK: `CUSTOMER#${config.customer_id}`,
-      //     SK: 'CONFIG',
-      //     ...config,
-      //     updatedAt: new Date().toISOString(),
-      //   },
-      // };
-      // await dynamodb.put(params).promise();
+    // TODO: AWS SDK - Replace with actual DynamoDB putItem call
+    // Example:
+    // const dynamodb = new AWS.DynamoDB.DocumentClient();
+    // const item = {
+    //   PK: `CUSTOMER#\${config.customer_id}`,
+    //   SK: 'CONFIG',
+    //   ...config,
+    //   updatedAt: new Date().toISOString(),
+    // };
+    // const params = { TableName: this.tableName, Item: item };
+    // await dynamodb.put(params).promise();
+    // return success(undefined);
 
-      this.logger.info('Customer configuration saved successfully', {
+    try {
+      // Mock implementation - Placeholder for actual AWS SDK call
+      this.logger.warn('Mock implementation: saveCustomerConfig called', { customerId: config.customer_id });
+      this.logger.info('Customer configuration saved successfully (mock)', {
         customerId: config.customer_id,
         version: config.version,
       });
@@ -107,9 +139,20 @@ export class DynamoDBConfigStore implements IConfigStore {
   async deleteCustomerConfig(customerId: string): Promise<Result<void, Error>> {
     this.logger.info('Deleting customer configuration', { customerId });
 
+    // TODO: AWS SDK - Replace with actual DynamoDB deleteItem call
+    // Example:
+    // const dynamodb = new AWS.DynamoDB.DocumentClient();
+    // const params = {
+    //   TableName: this.tableName,
+    //   Key: { PK: `CUSTOMER#\${customerId}`, SK: 'CONFIG' },
+    // };
+    // await dynamodb.delete(params).promise();
+    // return success(undefined);
+
     try {
-      // Mock implementation - in real implementation, use AWS SDK
-      this.logger.info('Customer configuration deleted successfully', { customerId });
+      // Mock implementation - Placeholder for actual AWS SDK call
+      this.logger.warn('Mock implementation: deleteCustomerConfig called', { customerId });
+      this.logger.info('Customer configuration deleted successfully (mock)', { customerId });
       return success(undefined);
     } catch (error) {
       this.logger.error('Failed to delete customer configuration', {
@@ -127,14 +170,25 @@ export class DynamoDBConfigStore implements IConfigStore {
   async listCustomerConfigs(): Promise<Result<CustomerConfig[], Error>> {
     this.logger.info('Listing customer configurations');
 
-    try {
-      // Mock implementation - in real implementation, use AWS SDK
-      const mockConfigs = [
-        this.createMockCustomerConfig('customer-1'),
-        this.createMockCustomerConfig('customer-2'),
-      ];
+    // TODO: AWS SDK - Replace with actual DynamoDB scan or query call
+    // Example (Scan - potentially inefficient for large tables):
+    // const dynamodb = new AWS.DynamoDB.DocumentClient();
+    // const params = {
+    //   TableName: this.tableName,
+    //   FilterExpression: "begins_with(PK, :pk_prefix) AND SK = :sk_value",
+    //   ExpressionAttributeValues: { ":pk_prefix": "CUSTOMER#", ":sk_value": "CONFIG" }
+    // };
+    // const result = await dynamodb.scan(params).promise();
+    // return success(result.Items as CustomerConfig[]);
+    // Consider pagination for large datasets (LastEvaluatedKey).
+    // A GSI might be more appropriate for querying all customer configs.
 
-      this.logger.info('Customer configurations listed successfully', {
+    try {
+      // Mock implementation - Placeholder for actual AWS SDK call
+      this.logger.warn('Mock implementation: Returning empty array for listCustomerConfigs');
+      const mockConfigs: CustomerConfig[] = [];
+
+      this.logger.info('Customer configurations listed successfully (mock)', {
         count: mockConfigs.length,
       });
 
@@ -154,18 +208,26 @@ export class DynamoDBConfigStore implements IConfigStore {
   async getModuleConfig(customerId: string, moduleId: string): Promise<Result<ModuleConfig, Error>> {
     this.logger.info('Getting module configuration', { customerId, moduleId });
 
+    // TODO: AWS SDK - Current mock relies on getCustomerConfig.
+    // If modules were separate items, this would be a direct getItem:
+    // Key: { PK: `CUSTOMER#\${customerId}`, SK: `MODULE#\${moduleId}` }
     try {
       const customerConfigResult = await this.getCustomerConfig(customerId);
       if (!customerConfigResult.success) {
-        return customerConfigResult as Result<ModuleConfig, Error>;
+        // If getCustomerConfig is a mock returning failure, this path will be taken.
+        this.logger.warn('getModuleConfig: getCustomerConfig failed (mock behavior)', { customerId });
+        return failure(new Error(`Cannot get module, as getCustomerConfig failed for ${customerId} (mock).`));
       }
 
+      // This part assumes getCustomerConfig returned a valid (though potentially mock) CustomerConfig
+      // As getCustomerConfig mock now returns failure, this part is less likely to be hit
+      // unless the mock for getCustomerConfig is changed to return success with some data.
       const moduleConfig = customerConfigResult.data.modules.find(m => m.module_id === moduleId);
       if (!moduleConfig) {
-        return failure(new Error(`Module configuration not found: ${moduleId}`));
+        return failure(new Error(`Module configuration not found: ${moduleId} in mock customer config for ${customerId}`));
       }
 
-      this.logger.info('Module configuration retrieved successfully', {
+      this.logger.info('Module configuration retrieved successfully (from mock customer config)', {
         customerId,
         moduleId,
       });
@@ -191,10 +253,15 @@ export class DynamoDBConfigStore implements IConfigStore {
       moduleId: config.module_id,
     });
 
+    // TODO: AWS SDK - Current mock relies on getCustomerConfig and saveCustomerConfig.
+    // If modules were separate items, this could be a direct putItem for the module:
+    // Item: { PK: `CUSTOMER#\${customerId}`, SK: `MODULE#\${config.module_id}`, ...module_specific_data }
+    // Or it might involve updating a list of modules in the main customer config item if modules are not too large.
     try {
       const customerConfigResult = await this.getCustomerConfig(customerId);
       if (!customerConfigResult.success) {
-        return customerConfigResult as Result<void, Error>;
+        this.logger.warn('saveModuleConfig: getCustomerConfig failed (mock behavior)', { customerId });
+        return failure(new Error(`Cannot save module, as getCustomerConfig failed for ${customerId} (mock).`));
       }
 
       const customerConfig = customerConfigResult.data;
@@ -206,8 +273,8 @@ export class DynamoDBConfigStore implements IConfigStore {
         customerConfig.modules.push(config);
       }
 
-      customerConfig.updatedAt = new Date();
-      return this.saveCustomerConfig(customerConfig);
+      customerConfig.updatedAt = new Date(); // This assumes CustomerConfig has an updatedAt field
+      return this.saveCustomerConfig(customerConfig); // This will call the mocked saveCustomerConfig
     } catch (error) {
       this.logger.error('Failed to save module configuration', {
         customerId,
@@ -225,19 +292,24 @@ export class DynamoDBConfigStore implements IConfigStore {
   async deleteModuleConfig(customerId: string, moduleId: string): Promise<Result<void, Error>> {
     this.logger.info('Deleting module configuration', { customerId, moduleId });
 
+    // TODO: AWS SDK - Current mock relies on getCustomerConfig and saveCustomerConfig.
+    // If modules were separate items, this could be a direct deleteItem for the module:
+    // Key: { PK: `CUSTOMER#\${customerId}`, SK: `MODULE#\${moduleId}` }
+    // Or it might involve updating the list of modules in the main customer config item.
     try {
       const customerConfigResult = await this.getCustomerConfig(customerId);
       if (!customerConfigResult.success) {
-        return customerConfigResult as Result<void, Error>;
+        this.logger.warn('deleteModuleConfig: getCustomerConfig failed (mock behavior)', { customerId });
+        return failure(new Error(`Cannot delete module, as getCustomerConfig failed for ${customerId} (mock).`));
       }
 
       const customerConfig = customerConfigResult.data;
       customerConfig.modules = customerConfig.modules.filter(m => m.module_id !== moduleId);
-      customerConfig.updatedAt = new Date();
+      // customerConfig.updatedAt = new Date(); // This assumes CustomerConfig has an updatedAt field
 
-      return this.saveCustomerConfig(customerConfig);
+      return this.saveCustomerConfig(customerConfig); // This will call the mocked saveCustomerConfig
     } catch (error) {
-      this.logger.error('Failed to delete module configuration', {
+      this.logger.error('Failed to delete module configuration (mock)', {
         customerId,
         moduleId,
         error: error instanceof Error ? error.message : String(error),
@@ -245,145 +317,6 @@ export class DynamoDBConfigStore implements IConfigStore {
 
       return failure(error instanceof Error ? error : new Error(String(error)));
     }
-  }
-
-  /**
-   * Create mock customer configuration for testing
-   */
-  private createMockCustomerConfig(customerId: string): CustomerConfig {
-    return {
-      customer_id: customerId,
-      name: `Customer ${customerId}`,
-      version: '1.0.0',
-      isActive: true,
-      branding: {
-        primary_color: '#1e40af',
-        secondary_color: '#374151',
-        font_family: 'Inter, sans-serif',
-        theme: 'light',
-        application_title: 'Contact Center',
-        company_name: `Company ${customerId}`,
-      },
-      modules: [
-        {
-          module_id: 'ccp-core',
-          enabled: true,
-          position: 'sidebar',
-          priority: 1,
-          lazy: false,
-          settings: {
-            show_queue_stats: true,
-            enable_recording_controls: true,
-          },
-          permissions: ['read', 'write'],
-          dependencies: [],
-        },
-        {
-          module_id: 'customer-info',
-          enabled: true,
-          position: 'main',
-          priority: 2,
-          lazy: true,
-          settings: {
-            data_sources: ['connect-profiles'],
-            screen_pop_enabled: true,
-          },
-          permissions: ['read'],
-          dependencies: ['ccp-core'],
-        },
-      ],
-      features: {
-        recording_controls: true,
-        screen_sharing: false,
-        file_uploads: true,
-        chat_functionality: true,
-        supervisor_monitoring: false,
-        analytics_dashboard: true,
-        custom_scripts: false,
-        third_party_integrations: true,
-        advanced_routing: false,
-        real_time_reporting: true,
-        voice_analytics: false,
-        sentiment_analysis: false,
-      },
-      integrations: [],
-      deployment: {
-        domain: `${customerId}.connect.example.com`,
-        cdn_distribution: `dist-${customerId}`,
-        environment: 'production',
-        region: 'us-east-1',
-        ssl_certificate: `cert-${customerId}`,
-        custom_domains: [],
-        caching_strategy: {
-          enabled: true,
-          ttl: 3600,
-          static_assets_ttl: 86400,
-          api_cache_ttl: 300,
-          invalidation_rules: [],
-        },
-        monitoring: {
-          enabled: true,
-          log_level: 'info',
-          metrics_enabled: true,
-          alerts_enabled: true,
-          notification_channels: [],
-        },
-      },
-      security: {
-        content_security_policy: {
-          enabled: true,
-          directives: {
-            'default-src': ["'self'"],
-            'script-src': ["'self'", "'unsafe-inline'"],
-          },
-          report_only: false,
-        },
-        cors: {
-          enabled: true,
-          allowed_origins: [`https://${customerId}.connect.example.com`],
-          allowed_methods: ['GET', 'POST'],
-          allowed_headers: ['Content-Type'],
-          exposed_headers: [],
-          credentials: false,
-          max_age: 86400,
-        },
-        session: {
-          timeout_minutes: 60,
-          sliding_expiration: true,
-          secure_cookies: true,
-          same_site_policy: 'strict',
-          idle_timeout_minutes: 30,
-        },
-        encryption: {
-          algorithm: 'AES-256-GCM',
-          key_rotation_days: 90,
-          data_at_rest: true,
-          data_in_transit: true,
-          pii_encryption: true,
-        },
-        audit: {
-          enabled: true,
-          log_all_requests: false,
-          log_data_access: true,
-          retention_days: 365,
-          export_enabled: true,
-          anonymize_pii: true,
-        },
-      },
-      vdi: {
-        platform: 'auto-detect',
-        audio_optimization: true,
-        video_optimization: false,
-        bandwidth_optimization: true,
-        local_storage_enabled: false,
-        clipboard_enabled: true,
-        file_transfer_enabled: false,
-        print_redirection: false,
-        performance_monitoring: true,
-      },
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
   }
 }
 
@@ -394,8 +327,19 @@ export class MemoryConfigStore implements IConfigStore {
   private readonly configs = new Map<string, CustomerConfig>();
   private readonly logger: Logger;
 
-  constructor(logger: Logger) {
-    this.logger = logger.createChild('MemoryConfigStore');
+  constructor(logger?: Logger) {
+    if (logger) {
+      this.logger = logger.createChild('MemoryConfigStore');
+    } else {
+      // Fallback logger
+      this.logger = {
+        debug: (message, context) => console.debug(`[MemoryConfigStore] ${message}`, context || ''),
+        info: (message, context) => console.info(`[MemoryConfigStore] ${message}`, context || ''),
+        warn: (message, context) => console.warn(`[MemoryConfigStore] ${message}`, context || ''),
+        error: (message, context) => console.error(`[MemoryConfigStore] ${message}`, context || ''),
+        createChild: () => this.logger, // Simplistic child creation
+      } as Logger;
+    }
   }
 
   async getCustomerConfig(customerId: string): Promise<Result<CustomerConfig, Error>> {
