@@ -16,7 +16,8 @@ import {
   GetCommand,
   PutCommand,
   DeleteCommand,
-  ScanCommand
+  ScanCommand,
+  QueryCommand
 } from "@aws-sdk/lib-dynamodb";
 
 /**
@@ -61,8 +62,13 @@ export class DynamoDBConfigStore implements IConfigStore {
       } as Logger;
     }
 
-    const client = new DynamoDBClient({}); // Basic client configuration, region can be configured via ENV variables or shared config
-    this.ddbDocClient = DynamoDBDocumentClient.from(client);
+    const client = new DynamoDBClient({
+      region: process.env.AWS_REGION || 'us-east-1',
+      maxAttempts: 3,
+    });
+    this.ddbDocClient = DynamoDBDocumentClient.from(client, {
+      marshallOptions: { removeUndefinedValues: true },
+    });
   }
 
   /**
@@ -176,23 +182,18 @@ export class DynamoDBConfigStore implements IConfigStore {
   async listCustomerConfigs(): Promise<Result<CustomerConfig[], Error>> {
     this.logger.info('Listing all customer configurations');
 
-    // TODO: Consider GSI for performance on large tables instead of Scan.
-    // A GSI on a common attribute or on the SK (if SK='CONFIG' is sparse for other items)
-    // could be more efficient. For now, using Scan with a filter.
     const params = {
       TableName: this.tableName,
-      FilterExpression: "begins_with(PK, :pk_prefix) AND SK = :sk_value",
+      IndexName: 'GSI1',
+      KeyConditionExpression: 'SK = :sk',
       ExpressionAttributeValues: {
-        ":pk_prefix": "CUSTOMER#",
-        ":sk_value": "CONFIG",
+        ':sk': 'CONFIG',
       },
     };
 
     try {
-      this.logger.debug('Attempting to scan items from DynamoDB', params);
-      // Note: Scan operations can be slow and costly on large tables.
-      // Consider pagination if many config items are expected.
-      const { Items } = await this.ddbDocClient.send(new ScanCommand(params));
+      this.logger.debug('Querying customer configurations via GSI', params);
+      const { Items } = await this.ddbDocClient.send(new QueryCommand(params));
 
       if (!Items) {
         // This case might not be typical for Scan if the table exists,
@@ -221,45 +222,29 @@ export class DynamoDBConfigStore implements IConfigStore {
   async getModuleConfig(customerId: string, moduleId: string): Promise<Result<ModuleConfig, Error>> {
     this.logger.info('Getting module configuration', { customerId, moduleId });
 
-    // TODO: AWS SDK - Current mock relies on getCustomerConfig.
-    // If modules were separate items, this would be a direct GetCommand similar to getCustomerConfig.
+    const params = {
+      TableName: this.tableName,
+      Key: { PK: `CUSTOMER#${customerId}`, SK: `MODULE#${moduleId}` },
+    };
 
     try {
-      const customerConfigResult = await this.getCustomerConfig(customerId);
+      this.logger.debug('Attempting to get module from DynamoDB', params);
+      const { Item } = await this.ddbDocClient.send(new GetCommand(params));
 
-      if (!customerConfigResult.success) {
-        this.logger.warn('Failed to get customer configuration while trying to get module config', {
-          customerId,
-          moduleId,
-          error: customerConfigResult.error.message,
-        });
-        // Propagate the error from getCustomerConfig
-        return failure(new Error(`Failed to retrieve customer config for module fetching: ${customerConfigResult.error.message}`));
-      }
-
-      const customerConfig = customerConfigResult.data;
-      const moduleConfig = customerConfig.modules?.find(m => m.module_id === moduleId);
-
-      if (!moduleConfig) {
+      if (!Item) {
         this.logger.warn('Module configuration not found for customer', { customerId, moduleId });
         return failure(new Error(`Module configuration not found: ${moduleId}`));
       }
 
-      this.logger.info('Module configuration retrieved successfully', {
-        customerId,
-        moduleId,
-        // moduleVersion: moduleConfig.version // Example if module has a version
-      });
-      return success(moduleConfig);
+      this.logger.info('Module configuration retrieved successfully', { customerId, moduleId });
+      return success(Item as ModuleConfig);
     } catch (error) {
-      // This catch block might be redundant if getCustomerConfig handles its errors thoroughly
-      // and converts them to `Result` objects. However, it's a safeguard.
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error('Failed to get module configuration', {
         customerId,
         moduleId,
         error: errorMessage,
-        stack: error instanceof Error ? error.stack : undefined
+        stack: error instanceof Error ? error.stack : undefined,
       });
       return failure(error instanceof Error ? error : new Error(errorMessage));
     }
@@ -272,71 +257,32 @@ export class DynamoDBConfigStore implements IConfigStore {
     this.logger.info('Saving module configuration', {
       customerId,
       moduleId: config.module_id,
-      // moduleVersion: config.version // If applicable
     });
 
-    // This method relies on a get-modify-put pattern for the entire customer configuration.
-    // For high-concurrency environments or large config objects,
-    // consider updating only the specific module using conditional updates if possible,
-    // or storing modules as separate DynamoDB items.
+    const item = {
+      PK: `CUSTOMER#${customerId}`,
+      SK: `MODULE#${config.module_id}`,
+      ...config,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const params = {
+      TableName: this.tableName,
+      Item: item,
+    };
 
     try {
-      const customerConfigResult = await this.getCustomerConfig(customerId);
-
-      if (!customerConfigResult.success) {
-        this.logger.warn('Failed to get customer configuration while trying to save module config', {
-          customerId,
-          moduleId: config.module_id,
-          error: customerConfigResult.error.message,
-        });
-        return failure(new Error(`Failed to retrieve customer config for module saving: ${customerConfigResult.error.message}`));
-      }
-
-      const customerConfig = customerConfigResult.data;
-      
-      // Ensure modules array exists
-      if (!customerConfig.modules) {
-          customerConfig.modules = [];
-      }
-
-      const moduleIndex = customerConfig.modules.findIndex(m => m.module_id === config.module_id);
-
-      if (moduleIndex >= 0) {
-        customerConfig.modules[moduleIndex] = config;
-      } else {
-        customerConfig.modules.push(config);
-      }
-
-      // Assuming CustomerConfig has an 'updatedAt' field that should be set by saveCustomerConfig.
-      // If CustomerConfig type definition doesn't have 'updatedAt', this might be an issue,
-      // but saveCustomerConfig itself adds 'updatedAt' before sending to DynamoDB.
-      // No need to set customerConfig.updatedAt = new Date(); here as saveCustomerConfig handles it.
-
-      this.logger.debug('Attempting to save updated customer configuration for module change', { customerId, moduleId: config.module_id });
-      const saveResult = await this.saveCustomerConfig(customerConfig);
-
-      if (!saveResult.success) {
-        this.logger.error('Failed to save customer configuration after updating module', {
-          customerId,
-          moduleId: config.module_id,
-          error: saveResult.error.message,
-        });
-        return failure(new Error(`Failed to save customer config after module update: ${saveResult.error.message}`));
-      }
-
-      this.logger.info('Module configuration saved successfully by updating customer config', {
-        customerId,
-        moduleId: config.module_id,
-      });
+      this.logger.debug('Putting module item into DynamoDB', params);
+      await this.ddbDocClient.send(new PutCommand(params));
+      this.logger.info('Module configuration saved successfully', { customerId, moduleId: config.module_id });
       return success(undefined);
     } catch (error) {
-      // This catch block is a general safeguard.
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error('Failed to save module configuration', {
         customerId,
         moduleId: config.module_id,
         error: errorMessage,
-        stack: error instanceof Error ? error.stack : undefined
+        stack: error instanceof Error ? error.stack : undefined,
       });
       return failure(error instanceof Error ? error : new Error(errorMessage));
     }
@@ -348,60 +294,15 @@ export class DynamoDBConfigStore implements IConfigStore {
   async deleteModuleConfig(customerId: string, moduleId: string): Promise<Result<void, Error>> {
     this.logger.info('Deleting module configuration', { customerId, moduleId });
 
-    // This method also relies on a get-modify-put pattern for the entire customer configuration.
-    // Similar considerations as saveModuleConfig apply here regarding concurrency and large objects.
+    const params = {
+      TableName: this.tableName,
+      Key: { PK: `CUSTOMER#${customerId}`, SK: `MODULE#${moduleId}` },
+    };
 
     try {
-      const customerConfigResult = await this.getCustomerConfig(customerId);
-
-      if (!customerConfigResult.success) {
-        this.logger.warn('Failed to get customer configuration while trying to delete module config', {
-          customerId,
-          moduleId,
-          error: customerConfigResult.error.message,
-        });
-        return failure(new Error(`Failed to retrieve customer config for module deletion: ${customerConfigResult.error.message}`));
-      }
-
-      const customerConfig = customerConfigResult.data;
-
-      if (!customerConfig.modules) {
-        // If modules array doesn't exist, the module to delete also doesn't exist.
-        this.logger.warn('Modules array does not exist, cannot delete module', { customerId, moduleId });
-        // Consider this a success as the module is effectively not there.
-        // Or, return a specific error/warning if this state is unexpected.
-        // For now, let's treat it as if the module is already deleted.
-        return success(undefined);
-      }
-
-      const initialModuleCount = customerConfig.modules.length;
-      customerConfig.modules = customerConfig.modules.filter(m => m.module_id !== moduleId);
-
-      if (customerConfig.modules.length === initialModuleCount) {
-        this.logger.warn('Module to delete was not found in customer configuration', { customerId, moduleId });
-        // Module was not found, effectively it's already "deleted" or never existed.
-        // Depending on desired strictness, this could be an error or a silent success.
-        // Returning success for idempotency.
-        return success(undefined);
-      }
-
-      // As with saveModuleConfig, saveCustomerConfig handles 'updatedAt'.
-      this.logger.debug('Attempting to save updated customer configuration after module deletion', { customerId, moduleId });
-      const saveResult = await this.saveCustomerConfig(customerConfig);
-
-      if (!saveResult.success) {
-        this.logger.error('Failed to save customer configuration after deleting module', {
-          customerId,
-          moduleId,
-          error: saveResult.error.message,
-        });
-        return failure(new Error(`Failed to save customer config after module deletion: ${saveResult.error.message}`));
-      }
-
-      this.logger.info('Module configuration deleted successfully by updating customer config', {
-        customerId,
-        moduleId,
-      });
+      this.logger.debug('Deleting module item from DynamoDB', params);
+      await this.ddbDocClient.send(new DeleteCommand(params));
+      this.logger.info('Module configuration deleted successfully', { customerId, moduleId });
       return success(undefined);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

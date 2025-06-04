@@ -226,23 +226,20 @@ async function getModuleConfig(customerId: string, moduleId: string): Promise<AP
   try {
     console.log('Getting module configuration', { customerId, moduleId });
 
-    // First get the customer configuration
-    const customerResult = await getCustomerConfig(customerId);
-    if (customerResult.statusCode !== 200) {
-      return customerResult;
-    }
+    const command = new GetCommand({
+      TableName: TABLE_NAME,
+      Key: { PK: `CUSTOMER#${customerId}`, SK: `MODULE#${moduleId}` },
+    });
 
-    const customerConfig = JSON.parse(customerResult.body) as CustomerConfig;
-    const moduleConfig = customerConfig.modules.find(m => m.module_id === moduleId);
+    const result = await docClient.send(command);
 
-    if (!moduleConfig) {
+    if (!result.Item) {
       return createErrorResponse(404, `Module configuration not found: ${moduleId}`);
     }
 
-    console.log('Module configuration retrieved successfully', {
-      customerId,
-      moduleId,
-    });
+    const { PK, SK, ...moduleConfig } = result.Item as ModuleConfig & { PK: string; SK: string };
+
+    console.log('Module configuration retrieved successfully', { customerId, moduleId });
 
     return createResponse(200, moduleConfig);
   } catch (error) {
@@ -270,41 +267,22 @@ async function saveModuleConfig(customerId: string, config: ModuleConfig): Promi
       moduleId: config.module_id,
     });
 
-    // Get existing customer configuration
-    const getResult = await docClient.send(new GetCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `CUSTOMER#${customerId}`,
-        SK: 'CONFIG',
-      },
-    }));
+    const item = {
+      PK: `CUSTOMER#${customerId}`,
+      SK: `MODULE#${config.module_id}`,
+      ...config,
+      updatedAt: new Date().toISOString(),
+    };
 
-    if (!getResult.Item) {
-      return createErrorResponse(404, `Customer configuration not found: ${customerId}`);
-    }
+    const command = new PutCommand({ TableName: TABLE_NAME, Item: item });
 
-    const { PK, SK, ...customerConfig } = getResult.Item as CustomerConfig & { PK: string; SK: string };
+    await docClient.send(command);
 
-    // Update or add module configuration
-    const moduleIndex = customerConfig.modules.findIndex(m => m.module_id === config.module_id);
-    if (moduleIndex >= 0) {
-      customerConfig.modules[moduleIndex] = config;
-    } else {
-      customerConfig.modules.push(config);
-    }
-
-    // Save updated configuration
-    const saveResult = await saveCustomerConfig(customerConfig);
-    
-    if (saveResult.statusCode === 200) {
-      return createResponse(200, {
-        message: 'Module configuration saved successfully',
-        customerId,
-        moduleId: config.module_id,
-      });
-    }
-
-    return saveResult;
+    return createResponse(200, {
+      message: 'Module configuration saved successfully',
+      customerId,
+      moduleId: config.module_id,
+    });
   } catch (error) {
     console.error('Failed to save module configuration', {
       customerId,
@@ -327,36 +305,18 @@ async function deleteModuleConfig(customerId: string, moduleId: string): Promise
   try {
     console.log('Deleting module configuration', { customerId, moduleId });
 
-    // Get existing customer configuration
-    const getResult = await docClient.send(new GetCommand({
+    const command = new DeleteCommand({
       TableName: TABLE_NAME,
-      Key: {
-        PK: `CUSTOMER#${customerId}`,
-        SK: 'CONFIG',
-      },
-    }));
+      Key: { PK: `CUSTOMER#${customerId}`, SK: `MODULE#${moduleId}` },
+    });
 
-    if (!getResult.Item) {
-      return createErrorResponse(404, `Customer configuration not found: ${customerId}`);
-    }
+    await docClient.send(command);
 
-    const { PK, SK, ...customerConfig } = getResult.Item as CustomerConfig & { PK: string; SK: string };
-
-    // Remove module configuration
-    customerConfig.modules = customerConfig.modules.filter(m => m.module_id !== moduleId);
-
-    // Save updated configuration
-    const saveResult = await saveCustomerConfig(customerConfig);
-    
-    if (saveResult.statusCode === 200) {
-      return createResponse(200, {
-        message: 'Module configuration deleted successfully',
-        customerId,
-        moduleId,
-      });
-    }
-
-    return saveResult;
+    return createResponse(200, {
+      message: 'Module configuration deleted successfully',
+      customerId,
+      moduleId,
+    });
   } catch (error) {
     console.error('Failed to delete module configuration', {
       customerId,
