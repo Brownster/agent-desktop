@@ -28,8 +28,8 @@
     "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true,
     "paths": {
-      "@agent-desktop/config": ["libs/config/src/index.ts"],
       "@agent-desktop/core": ["libs/core/src/index.ts"],
+      "@agent-desktop/config": ["libs/config/src/index.ts"],
       "@agent-desktop/customer-info": ["libs/customer-info/src/index.ts"],
       "@agent-desktop/logging": ["libs/logging/src/index.ts"],
       "@agent-desktop/testing": ["libs/testing/src/index.ts"],
