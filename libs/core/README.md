@@ -316,3 +316,10 @@ See the test files for comprehensive usage examples:
 - `@agent-desktop/types` - TypeScript type definitions
 - `@agent-desktop/config` - Configuration management
 - `@agent-desktop/logging` - Structured logging
+
+## Module Templates
+
+Starter templates for new modules are available under `libs/core/templates`.
+The `ExampleModule` demonstrates minimal metadata and configuration. Copy this
+file when creating new modules to ensure consistent structure and dependency
+declarations.

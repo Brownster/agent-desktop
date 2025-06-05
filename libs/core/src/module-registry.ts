@@ -21,6 +21,7 @@ import {
   ModuleStatus,
   ModuleLoadStrategy,
 } from './base-module';
+import type { IModuleLoader } from './module-loader';
 
 /**
  * Module registry options
@@ -29,6 +30,7 @@ export interface ModuleRegistryOptions {
   readonly logger: Logger;
   readonly configService: ConfigService;
   readonly customerId: CustomerID;
+  readonly moduleLoader?: IModuleLoader;
   readonly enableHotReload?: boolean;
   readonly maxConcurrentLoads?: number;
   readonly dependencyTimeoutMs?: number;
@@ -184,7 +186,7 @@ export class ModuleRegistry implements IModuleRegistry {
       }
 
       // Validate module dependencies
-      const dependencyValidation = this.validateDependencies(module);
+      const dependencyValidation = await this.validateDependencies(module);
       if (!dependencyValidation.success) {
         return dependencyValidation;
       }
@@ -216,12 +218,21 @@ export class ModuleRegistry implements IModuleRegistry {
    */
   async unregister(moduleId: ModuleID): Promise<Result<void, Error>> {
     try {
-      const module = this.modules.get(moduleId);
+      let module = this.modules.get(moduleId);
       if (!module) {
-        return {
-          success: false,
-          error: new Error(`Module ${moduleId} is not registered`),
-        };
+        if (this.options.moduleLoader) {
+          const loadRes = await this.options.moduleLoader.loadModule({ moduleId });
+          if (!loadRes.success) {
+            return { success: false, error: loadRes.error };
+          }
+          const regRes = await this.register(loadRes.data.module);
+          if (!regRes.success) {
+            return regRes;
+          }
+          module = loadRes.data.module;
+        } else {
+          return { success: false, error: new Error(`Module ${moduleId} is not registered`) };
+        }
       }
 
       // Check if other modules depend on this one
@@ -292,12 +303,24 @@ export class ModuleRegistry implements IModuleRegistry {
    */
   private async performModuleLoad(moduleId: ModuleID): Promise<Result<void, Error>> {
     try {
-      const module = this.modules.get(moduleId);
+      let module = this.modules.get(moduleId);
       if (!module) {
-        return {
-          success: false,
-          error: new Error(`Module ${moduleId} is not registered`),
-        };
+        if (this.options.moduleLoader) {
+          const loadRes = await this.options.moduleLoader.loadModule({ moduleId });
+          if (!loadRes.success) {
+            return { success: false, error: loadRes.error };
+          }
+          const regRes = await this.register(loadRes.data.module);
+          if (!regRes.success) {
+            return regRes;
+          }
+          module = loadRes.data.module;
+        } else {
+          return {
+            success: false,
+            error: new Error(`Module ${moduleId} is not registered`),
+          };
+        }
       }
 
       // Skip if already loaded
@@ -582,13 +605,20 @@ export class ModuleRegistry implements IModuleRegistry {
    * @param module - Module to validate
    * @returns Validation result
    */
-  private validateDependencies(module: IModule): Result<void, Error> {
+  private async validateDependencies(module: IModule): Promise<Result<void, Error>> {
     for (const dependency of module.metadata.dependencies) {
-      if (!dependency.optional && !this.modules.has(dependency.moduleId)) {
-        return {
-          success: false,
-          error: new Error(`Required dependency ${dependency.moduleId} is not registered`),
-        };
+      if (!this.modules.has(dependency.moduleId)) {
+        if (this.options.moduleLoader) {
+          const loaded = await this.options.moduleLoader.loadModule({ moduleId: dependency.moduleId });
+          if (loaded.success) {
+            const reg = await this.register(loaded.data.module);
+            if (!reg.success) return reg;
+          } else if (!dependency.optional) {
+            return { success: false, error: new Error(`Required dependency ${dependency.moduleId} is not registered`) };
+          }
+        } else if (!dependency.optional) {
+          return { success: false, error: new Error(`Required dependency ${dependency.moduleId} is not registered`) };
+        }
       }
     }
     return { success: true, data: undefined };
@@ -610,19 +640,25 @@ export class ModuleRegistry implements IModuleRegistry {
     }
 
     const dependencyPromises = module.metadata.dependencies.map(async dependency => {
-      const dependencyModule = this.modules.get(dependency.moduleId);
+      let dependencyModule = this.modules.get(dependency.moduleId);
       if (!dependencyModule) {
-        if (dependency.optional) {
-          this.options.logger.warn('Optional dependency not found', {
-            moduleId,
-            dependency: dependency.moduleId,
-          });
+        if (this.options.moduleLoader) {
+          const loaded = await this.options.moduleLoader.loadModule({ moduleId: dependency.moduleId });
+          if (loaded.success) {
+            const reg = await this.register(loaded.data.module);
+            if (!reg.success) return reg;
+            dependencyModule = loaded.data.module;
+          } else if (dependency.optional) {
+            this.options.logger.warn('Optional dependency not found', { moduleId, dependency: dependency.moduleId });
+            return { success: true, data: undefined };
+          } else {
+            return { success: false, error: new Error(`Required dependency ${dependency.moduleId} not found`) };
+          }
+        } else if (dependency.optional) {
+          this.options.logger.warn('Optional dependency not found', { moduleId, dependency: dependency.moduleId });
           return { success: true, data: undefined };
         } else {
-          return {
-            success: false,
-            error: new Error(`Required dependency ${dependency.moduleId} not found`),
-          };
+          return { success: false, error: new Error(`Required dependency ${dependency.moduleId} not found`) };
         }
       }
 

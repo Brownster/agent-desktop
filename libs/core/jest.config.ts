@@ -3,6 +3,7 @@ module.exports = {
   displayName: 'core',
   preset: '../../jest.preset.js',
   testEnvironment: 'node',
+  setupFilesAfterEnv: ['../../jest.setup.js'],
   transform: {
     '^.+\\.[tj]s$': [
       'ts-jest',
