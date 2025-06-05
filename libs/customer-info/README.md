@@ -2,7 +2,7 @@
 
 React component and module wrapper that exposes the **ContactInfo** UI as a loadable module for the Agent Desktop. It provides the default configuration and metadata used by the core module system.
 
-The module simply re-exports the `ContactInfo` component from the `ccp-client` application and can be registered with the `ModuleRegistry` for dynamic loading.
+The module simply re-exports the `ContactInfo` component from the `@agent-desktop/ccp-client` package and can be registered with the `ModuleRegistry` for dynamic loading.
 
 ## Usage
 

@@ -34,7 +34,8 @@
       "@agent-desktop/logging": ["libs/logging/src/index.ts"],
       "@agent-desktop/testing": ["libs/testing/src/index.ts"],
       "@agent-desktop/types": ["libs/types/src/index.ts"],
-      "@agent-desktop/ui-components": ["libs/ui-components/src/index.ts"]
+      "@agent-desktop/ui-components": ["libs/ui-components/src/index.ts"],
+      "@agent-desktop/ccp-client": ["apps/ccp-client/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]
