@@ -11,6 +11,7 @@ import {
   UseMutationOptions,
 } from '@tanstack/react-query';
 import { brandingAPI, type ThemePreset, type BrandingValidationResult, type AssetUploadResponse } from '../api/branding.api';
+import { assetsAPI } from '../api/assets.api';
 import type { BrandingConfig } from '@/pages/Branding';
 
 /**
@@ -185,20 +186,11 @@ export function useUploadAsset(
   options?: UseMutationOptions<
     AssetUploadResponse,
     Error,
-    {
-      file: File;
-      options?: {
-        maxWidth?: number;
-        maxHeight?: number;
-        quality?: number;
-        format?: 'auto' | 'png' | 'jpg' | 'svg';
-      };
-    }
+    { file: File }
   >
 ) {
   return useMutation({
-    mutationFn: ({ file, options: uploadOptions }) => 
-      brandingAPI.uploadAsset(file, uploadOptions),
+    mutationFn: ({ file }) => assetsAPI.uploadAsset(file),
     ...options,
   });
 }
