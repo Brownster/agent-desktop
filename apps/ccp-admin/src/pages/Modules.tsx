@@ -617,11 +617,13 @@ function Modules(): React.ReactElement {
             <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <Switch
-                  checked={module.enabled}
+                  checked={module.enabled ?? false}
                   onChange={() =>
                     setModuleList(prev =>
                       prev.map(m =>
-                        m.id === module.id ? { ...m, enabled: !m.enabled } : m
+                        m.id === module.id
+                          ? { ...m, enabled: !(m.enabled ?? false) }
+                          : m
                       )
                     )
                   }
