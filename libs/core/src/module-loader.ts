@@ -193,7 +193,17 @@ export class ModuleLoader implements IModuleLoader {
       let lastError: Error | undefined;
       for (let attempt = 0; attempt <= retries; attempt++) {
         try {
-          const module = await this.loadModuleFromPath(resolvedPath, timeout);
+          // Load the module with the specified timeout
+          const module = await Promise.race([
+            this.loadModuleFromPath(resolvedPath, timeout),
+            new Promise<never>((_, reject) => 
+              setTimeout(
+                () => reject(new Error(`Module load timed out after ${timeout}ms`)), 
+                timeout
+              )
+            )
+          ]);
+          
           const loadTime = Date.now() - startTime;
 
           // Validate the loaded module
@@ -225,16 +235,19 @@ export class ModuleLoader implements IModuleLoader {
         } catch (error) {
           lastError = error instanceof Error ? error : new Error(String(error));
           
-          if (attempt < retries) {
-            this.logger.warn('Module load attempt failed, retrying', {
-              moduleId,
-              attempt: attempt + 1,
-              error: lastError.message,
-            });
-            
-            // Wait before retry with exponential backoff
-            await this.delay(Math.pow(2, attempt) * 1000);
+          // If this is a timeout error or we've exhausted retries, fail fast
+          if (lastError.message.includes('timed out') || attempt >= retries) {
+            break;
           }
+          
+          this.logger.warn('Module load attempt failed, retrying', {
+            moduleId,
+            attempt: attempt + 1,
+            error: lastError.message,
+          });
+          
+          // Wait before retry with exponential backoff
+          await this.delay(Math.pow(2, attempt) * 100);
         }
       }
 
@@ -259,33 +272,88 @@ export class ModuleLoader implements IModuleLoader {
    */
   private async loadModuleFromPath(modulePath: string, timeout: number): Promise<IModule> {
     return new Promise<IModule>((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
-        reject(new Error(`Module load timeout after ${timeout}ms`));
+      let timeoutId: NodeJS.Timeout | null = null;
+      let isComplete = false;
+
+      const cleanup = () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+      };
+
+      const onComplete = (result: IModule) => {
+        if (isComplete) return;
+        isComplete = true;
+        cleanup();
+        resolve(result);
+      };
+
+      const onError = (error: Error) => {
+        if (isComplete) return;
+        isComplete = true;
+        cleanup();
+        reject(error);
+      };
+
+      // Set timeout
+      timeoutId = setTimeout(() => {
+        onError(new Error(`Module load timed out after ${timeout}ms`));
       }, timeout);
 
-      // Dynamic import with timeout
-      import(modulePath)
-        .then(moduleExports => {
-          clearTimeout(timeoutId);
-          
-          // Look for the module class/factory
-          const ModuleClass = moduleExports.default || moduleExports.Module || moduleExports;
-          
-          if (typeof ModuleClass === 'function') {
-            // Instantiate the module
-            const module = new ModuleClass();
-            resolve(module);
-          } else if (typeof ModuleClass === 'object' && ModuleClass !== null) {
-            // Already instantiated module
-            resolve(ModuleClass as IModule);
-          } else {
-            reject(new Error(`Invalid module export from ${modulePath}`));
+      // Use import() for ES modules and require() for CommonJS
+      const loadModule = async () => {
+        try {
+          // First try ES modules with import()
+          try {
+            const moduleExports = await import(modulePath);
+            const ModuleClass = moduleExports.default || moduleExports.Module || moduleExports;
+            
+            if (typeof ModuleClass === 'function') {
+              const instance = new ModuleClass();
+              // Check if the module has an async initialization step
+              if (typeof instance.waitForInitialization === 'function') {
+                await instance.waitForInitialization();
+              }
+              onComplete(instance);
+            } else if (typeof ModuleClass === 'object' && ModuleClass !== null) {
+              onComplete(ModuleClass as IModule);
+            } else {
+              throw new Error(`Invalid module export from ${modulePath}`);
+            }
+          } catch (importError) {
+            // Fall back to CommonJS require() if import() fails
+            try {
+              // Clear the require cache to ensure fresh module load
+              delete require.cache[require.resolve(modulePath)];
+              const moduleExports = require(modulePath);
+              const ModuleClass = moduleExports.default || moduleExports.Module || moduleExports;
+              
+              if (typeof ModuleClass === 'function') {
+                const instance = new ModuleClass();
+                // Check if the module has an async initialization step
+                if (typeof instance.waitForInitialization === 'function') {
+                  await instance.waitForInitialization();
+                }
+                onComplete(instance);
+              } else if (typeof ModuleClass === 'object' && ModuleClass !== null) {
+                onComplete(ModuleClass as IModule);
+              } else {
+                throw new Error(`Invalid module export from ${modulePath}`);
+              }
+            } catch (requireError: unknown) {
+              const errorMessage = requireError instanceof Error ? requireError.message : 'Unknown error';
+              throw new Error(`Failed to load module: ${errorMessage}`);
+            }
           }
-        })
-        .catch(error => {
-          clearTimeout(timeoutId);
-          reject(error);
-        });
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          throw new Error(`Failed to load module from ${modulePath}: ${errorMessage}`);
+        }
+      };
+
+      // Start loading the module
+      loadModule().catch(onError);
     });
   }
 

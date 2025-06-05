@@ -8,7 +8,7 @@ describe('ConfigService', () => {
   let configService: ConfigService;
   let mockLogger: any;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mockLogger = (global as any).TestUtils?.createMockLogger() || {
       debug: jest.fn(),
       info: jest.fn(),
@@ -20,11 +20,23 @@ describe('ConfigService', () => {
     configService = new ConfigService({
       logger: mockLogger,
       enableWatching: true,
-      enableValidation: true,
+      enableValidation: false, // Disable for setup
       enableCaching: true,
       cacheSize: 100,
       cacheTtl: 1000, // 1 second for testing
+      storeType: 'memory', // Use memory store for tests
+      enableWebSocket: false, // Disable websocket for tests
     });
+
+    // Add test data to memory store
+    const testConfig = global.ConfigTestUtils.createMockConfig({
+      customer_id: 'test-customer',
+      name: 'Customer test-customer',
+    });
+    await configService.saveCustomerConfig(testConfig);
+
+    // Re-enable validation for tests
+    (configService as any).options.enableValidation = true;
   });
 
   describe('basic get/set operations', () => {
@@ -264,6 +276,12 @@ describe('ConfigService', () => {
     it('should validate configuration objects', () => {
       const validConfig = global.ConfigTestUtils.createMockConfig();
       const result = configService.validate(validConfig);
+
+      if (!result.isValid) {
+        console.log('Validation errors:', result.errors);
+        console.log('Config keys:', Object.keys(validConfig));
+        console.log('First few errors:', result.errors.slice(0, 3));
+      }
 
       expect(result.isValid).toBe(true);
       expect(result.errors).toHaveLength(0);

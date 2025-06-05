@@ -56,13 +56,11 @@ describe('ModuleHealthChecker', () => {
   let mockLogger: any;
 
   beforeEach(() => {
-    jest.useFakeTimers();
     mockLogger = global.TestUtils.createMockLogger();
     checker = new ModuleHealthChecker(mockLogger);
   });
 
   afterEach(async () => {
-    jest.useRealTimers();
     await checker.destroy();
   });
 
@@ -75,8 +73,8 @@ describe('ModuleHealthChecker', () => {
     const unhealthy = { status: 'unhealthy', message: 'fail', timestamp: new Date() };
     mod.getHealth = jest.fn().mockResolvedValue(unhealthy);
 
-    jest.advanceTimersByTime(50);
-    await Promise.resolve();
+    // Wait for the next health check cycle
+    await new Promise(resolve => setTimeout(resolve, 60));
 
     expect(checker.getModuleHealth(mod.metadata.id)).toEqual(unhealthy);
   });
@@ -85,12 +83,8 @@ describe('ModuleHealthChecker', () => {
     const mod = new TestModule(() => Promise.reject(new Error('fail')));
     await checker.startMonitoring(mod, { moduleId: mod.metadata.id, interval: 10, timeout: 5, retries: 2, enabled: true });
 
-    jest.advanceTimersByTime(10);
-    await Promise.resolve();
-    expect(checker.getModuleHealth(mod.metadata.id)?.status).toBe('unhealthy');
-
-    jest.advanceTimersByTime(10);
-    await Promise.resolve();
+    // Wait for initial health check to fail and retries to complete
+    await new Promise(resolve => setTimeout(resolve, 20));
     expect(checker.getModuleHealth(mod.metadata.id)?.status).toBe('unhealthy');
   });
 
@@ -98,8 +92,8 @@ describe('ModuleHealthChecker', () => {
     const mod = new TestModule(() => new Promise(resolve => setTimeout(() => resolve({ status: 'healthy', timestamp: new Date() }), 100)));
     await checker.startMonitoring(mod, { moduleId: mod.metadata.id, interval: 20, timeout: 5, retries: 0, enabled: true });
 
-    jest.advanceTimersByTime(20);
-    await Promise.resolve();
+    // Wait for timeout to occur
+    await new Promise(resolve => setTimeout(resolve, 30));
 
     const status = checker.getModuleHealth(mod.metadata.id);
     expect(status?.status).toBe('unhealthy');

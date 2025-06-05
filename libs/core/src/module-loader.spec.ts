@@ -59,9 +59,16 @@ describe('ModuleLoader', () => {
   });
 
   it('retries loading on failure', async () => {
-    const spy = jest.spyOn(loader as any, 'loadModuleFromPath');
-    spy.mockRejectedValueOnce(new Error('load failed'));
-    spy.mockResolvedValueOnce(require(goodModulePath));
+    let attempt = 0;
+    const spy = jest.spyOn(loader as any, 'loadModuleFromPath').mockImplementation(async (path: string) => {
+      attempt++;
+      if (attempt === 1) {
+        throw new Error('load failed');
+      }
+      // Return the good module instance on second attempt
+      const GoodModuleClass = require(goodModulePath);
+      return new GoodModuleClass();
+    });
 
     const result = await loader.loadModule({
       moduleId: 'good-module' as ModuleID,
@@ -70,6 +77,9 @@ describe('ModuleLoader', () => {
     });
 
     expect(spy).toHaveBeenCalledTimes(2);
+    if (!result.success) {
+      console.log('Retry test failed with error:', result.error?.message);
+    }
     expect(result.success).toBe(true);
   });
 
@@ -82,6 +92,6 @@ describe('ModuleLoader', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error?.message).toMatch(/timeout/i);
+    expect(result.error?.message).toMatch(/timed out/i);
   });
 });
