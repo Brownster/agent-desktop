@@ -1,4 +1,9 @@
 import React from 'react';
+import type {
+  ForwardRefExoticComponent,
+  RefAttributes,
+  SVGProps,
+} from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { 
   HomeIcon,
@@ -15,7 +20,12 @@ import {
 interface NavItem {
   name: string;
   href: string;
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  icon: ForwardRefExoticComponent<
+    Omit<SVGProps<SVGSVGElement>, 'ref'> & {
+      title?: string;
+      titleId?: string;
+    } & RefAttributes<SVGSVGElement>
+  >;
   description: string;
 }
 

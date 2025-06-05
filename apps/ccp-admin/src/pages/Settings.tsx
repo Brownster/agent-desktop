@@ -1,4 +1,9 @@
 import React, { useState } from 'react';
+import type {
+  ForwardRefExoticComponent,
+  RefAttributes,
+  SVGProps,
+} from 'react';
 import {
   Cog6ToothIcon,
   ShieldCheckIcon,
@@ -15,7 +20,12 @@ interface SettingsSection {
   id: string;
   name: string;
   description: string;
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  icon: ForwardRefExoticComponent<
+    Omit<SVGProps<SVGSVGElement>, 'ref'> & {
+      title?: string;
+      titleId?: string;
+    } & RefAttributes<SVGSVGElement>
+  >;
 }
 
 /**
