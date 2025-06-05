@@ -7,9 +7,9 @@ import React, { useContext } from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import { APIProvider, APIContext } from '../APIProvider';
 import { CustomerAPIService } from '../../services/api/customers.api';
-import { ModulesAPIService } from '../../services/api/modules.api';
+import { ModuleAPIService } from '../../services/api/modules.api';
 import { AnalyticsAPIService } from '../../services/api/analytics.api';
-import { WebSocketService } from '../../services/websocket/websocket.service';
+import { AdminWebSocketService } from '../../services/websocket/websocket.service';
 
 // Mock API services
 jest.mock('../../services/api/customers.api');
@@ -18,49 +18,41 @@ jest.mock('../../services/api/analytics.api');
 jest.mock('../../services/websocket/websocket.service');
 
 const MockedCustomerAPIService = CustomerAPIService as jest.MockedClass<typeof CustomerAPIService>;
-const MockedModulesAPIService = ModulesAPIService as jest.MockedClass<typeof ModulesAPIService>;
-const MockedAnalyticsAPIService = AnalyticsAPIService as jest.MockedClass<typeof AnalyticsAPIService>;
-const MockedWebSocketService = WebSocketService as jest.MockedClass<typeof WebSocketService>;
+const MockedModuleAPIService = ModuleAPIService as jest.MockedClass<typeof ModuleAPIService>;
+const MockedAnalyticsAPIService = AnalyticsAPIService as jest.MockedClass<
+  typeof AnalyticsAPIService
+>;
+const MockedWebSocketService = AdminWebSocketService as jest.MockedClass<
+  typeof AdminWebSocketService
+>;
 
 // Test component that uses API context
 const TestComponent: React.FC = () => {
-  const { 
-    customerAPI, 
-    modulesAPI, 
-    analyticsAPI, 
-    websocket,
-    isConnected,
-    connect,
-    disconnect 
-  } = useContext(APIContext);
+  const { customerAPI, modulesAPI, analyticsAPI, websocket, isConnected, connect, disconnect } =
+    useContext(APIContext);
 
   return (
     <div>
-      <div data-testid="connection-status">
-        {isConnected ? 'Connected' : 'Disconnected'}
-      </div>
-      <button 
-        data-testid="connect-btn" 
-        onClick={() => connect('ws://localhost:8080')}
-      >
+      <div data-testid='connection-status'>{isConnected ? 'Connected' : 'Disconnected'}</div>
+      <button data-testid='connect-btn' onClick={() => connect('ws://localhost:8080')}>
         Connect
       </button>
-      <button data-testid="disconnect-btn" onClick={disconnect}>
+      <button data-testid='disconnect-btn' onClick={disconnect}>
         Disconnect
       </button>
-      <div data-testid="customer-api">{customerAPI ? 'Available' : 'Not Available'}</div>
-      <div data-testid="modules-api">{modulesAPI ? 'Available' : 'Not Available'}</div>
-      <div data-testid="analytics-api">{analyticsAPI ? 'Available' : 'Not Available'}</div>
-      <div data-testid="websocket">{websocket ? 'Available' : 'Not Available'}</div>
+      <div data-testid='customer-api'>{customerAPI ? 'Available' : 'Not Available'}</div>
+      <div data-testid='modules-api'>{modulesAPI ? 'Available' : 'Not Available'}</div>
+      <div data-testid='analytics-api'>{analyticsAPI ? 'Available' : 'Not Available'}</div>
+      <div data-testid='websocket'>{websocket ? 'Available' : 'Not Available'}</div>
     </div>
   );
 };
 
 describe('APIProvider Integration Tests', () => {
   let mockCustomerAPI: jest.Mocked<CustomerAPIService>;
-  let mockModulesAPI: jest.Mocked<ModulesAPIService>;
+  let mockModulesAPI: jest.Mocked<ModuleAPIService>;
   let mockAnalyticsAPI: jest.Mocked<AnalyticsAPIService>;
-  let mockWebSocket: jest.Mocked<WebSocketService>;
+  let mockWebSocket: jest.Mocked<AdminWebSocketService>;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -123,7 +115,7 @@ describe('APIProvider Integration Tests', () => {
 
     // Mock constructors
     MockedCustomerAPIService.mockImplementation(() => mockCustomerAPI);
-    MockedModulesAPIService.mockImplementation(() => mockModulesAPI);
+    MockedModuleAPIService.mockImplementation(() => mockModulesAPI);
     MockedAnalyticsAPIService.mockImplementation(() => mockAnalyticsAPI);
     MockedWebSocketService.mockImplementation(() => mockWebSocket);
   });
@@ -158,9 +150,9 @@ describe('APIProvider Integration Tests', () => {
       const TestMultipleConsumers: React.FC = () => {
         const context1 = useContext(APIContext);
         const context2 = useContext(APIContext);
-        
+
         return (
-          <div data-testid="same-instance">
+          <div data-testid='same-instance'>
             {context1.customerAPI === context2.customerAPI ? 'Same' : 'Different'}
           </div>
         );
@@ -188,7 +180,7 @@ describe('APIProvider Integration Tests', () => {
       );
 
       const connectBtn = screen.getByTestId('connect-btn');
-      
+
       await act(async () => {
         connectBtn.click();
       });
@@ -210,7 +202,7 @@ describe('APIProvider Integration Tests', () => {
       );
 
       const disconnectBtn = screen.getByTestId('disconnect-btn');
-      
+
       await act(async () => {
         disconnectBtn.click();
       });
@@ -230,7 +222,7 @@ describe('APIProvider Integration Tests', () => {
       );
 
       const connectBtn = screen.getByTestId('connect-btn');
-      
+
       await act(async () => {
         connectBtn.click();
       });
@@ -255,14 +247,14 @@ describe('APIProvider Integration Tests', () => {
 
       const CustomerUpdateComponent: React.FC = () => {
         const { websocket } = useContext(APIContext);
-        
+
         React.useEffect(() => {
           if (websocket) {
             return websocket.subscribe('customer_update', mockSubscribe);
           }
         }, [websocket]);
 
-        return <div data-testid="customer-updates">Listening for updates</div>;
+        return <div data-testid='customer-updates'>Listening for updates</div>;
       };
 
       render(
@@ -282,14 +274,14 @@ describe('APIProvider Integration Tests', () => {
 
       const ModuleStatusComponent: React.FC = () => {
         const { websocket } = useContext(APIContext);
-        
+
         React.useEffect(() => {
           if (websocket) {
             return websocket.subscribe('module_status', mockSubscribe);
           }
         }, [websocket]);
 
-        return <div data-testid="module-status">Monitoring modules</div>;
+        return <div data-testid='module-status'>Monitoring modules</div>;
       };
 
       render(
@@ -376,7 +368,7 @@ describe('APIProvider Integration Tests', () => {
       );
 
       const initialCustomerAPICallCount = MockedCustomerAPIService.mock.calls.length;
-      const initialModulesAPICallCount = MockedModulesAPIService.mock.calls.length;
+      const initialModulesAPICallCount = MockedModuleAPIService.mock.calls.length;
       const initialAnalyticsAPICallCount = MockedAnalyticsAPIService.mock.calls.length;
 
       rerender(
@@ -386,7 +378,7 @@ describe('APIProvider Integration Tests', () => {
       );
 
       expect(MockedCustomerAPIService.mock.calls.length).toBe(initialCustomerAPICallCount);
-      expect(MockedModulesAPIService.mock.calls.length).toBe(initialModulesAPICallCount);
+      expect(MockedModuleAPIService.mock.calls.length).toBe(initialModulesAPICallCount);
       expect(MockedAnalyticsAPIService.mock.calls.length).toBe(initialAnalyticsAPICallCount);
     });
 
@@ -396,7 +388,7 @@ describe('APIProvider Integration Tests', () => {
 
       const SubscriptionComponent: React.FC = () => {
         const { websocket } = useContext(APIContext);
-        
+
         React.useEffect(() => {
           if (websocket) {
             return websocket.subscribe('test', () => {});
@@ -441,7 +433,7 @@ describe('APIProvider Integration Tests', () => {
         }, [customerAPI]);
 
         return (
-          <div data-testid="customer-list">
+          <div data-testid='customer-list'>
             {customers ? `${customers.items.length} customers` : 'Loading...'}
           </div>
         );
@@ -478,7 +470,7 @@ describe('APIProvider Integration Tests', () => {
         }, [modulesAPI]);
 
         return (
-          <div data-testid="module-list">
+          <div data-testid='module-list'>
             {modules ? `${modules.modules.length} modules` : 'Loading...'}
           </div>
         );
@@ -516,7 +508,7 @@ describe('APIProvider Integration Tests', () => {
         }, [analyticsAPI]);
 
         return (
-          <div data-testid="analytics">
+          <div data-testid='analytics'>
             {analytics ? `${analytics.totalCustomers} total customers` : 'Loading...'}
           </div>
         );
