@@ -1,4 +1,4 @@
-import '@testing-library/jest-dom';
+require('@testing-library/jest-dom');
 
 // Mock console.warn and console.error to reduce noise in tests
 const originalWarn = console.warn;
