@@ -1,4 +1,9 @@
 import React, { useMemo } from 'react';
+import type {
+  ForwardRefExoticComponent,
+  RefAttributes,
+  SVGProps,
+} from 'react';
 import { subDays, formatDistanceToNow } from 'date-fns';
 import {
   UserGroupIcon,
@@ -18,7 +23,12 @@ interface StatCard {
   value: string | number;
   change?: string;
   changeType?: 'increase' | 'decrease' | 'neutral';
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  icon: ForwardRefExoticComponent<
+    Omit<SVGProps<SVGSVGElement>, 'ref'> & {
+      title?: string;
+      titleId?: string;
+    } & RefAttributes<SVGSVGElement>
+  >;
 }
 
 /**
