@@ -323,7 +323,14 @@ function LogoUpload({
             <input
               type="number"
               value={logo.width || ''}
-              onChange={(e) => onLogoChange({ width: parseInt(e.target.value) || undefined })}
+              onChange={(e) => {
+                const value = parseInt(e.target.value, 10);
+                if (isNaN(value)) {
+                  onLogoChange({});
+                } else {
+                  onLogoChange({ width: value });
+                }
+              }}
               className="input"
               placeholder="Auto"
               min="50"
@@ -337,7 +344,14 @@ function LogoUpload({
             <input
               type="number"
               value={logo.height || ''}
-              onChange={(e) => onLogoChange({ height: parseInt(e.target.value) || undefined })}
+              onChange={(e) => {
+                const value = parseInt(e.target.value, 10);
+                if (isNaN(value)) {
+                  onLogoChange({});
+                } else {
+                  onLogoChange({ height: value });
+                }
+              }}
               className="input"
               placeholder="Auto"
               min="20"
