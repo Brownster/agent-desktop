@@ -3,21 +3,17 @@
  * @module @agent-desktop/config
  */
 
-import type {
-  CustomerConfig,
-  ModuleConfig,
-  Result,
-} from '@agent-desktop/types';
+import type { CustomerConfig, ModuleConfig, Result } from '@agent-desktop/types';
 import { success, failure } from '@agent-desktop/types';
 import type { Logger } from '@agent-desktop/logging';
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import {
   DynamoDBDocumentClient,
   GetCommand,
   PutCommand,
   DeleteCommand,
-  QueryCommand
-} from "@aws-sdk/lib-dynamodb";
+  QueryCommand,
+} from '@aws-sdk/lib-dynamodb';
 
 /**
  * Configuration storage interface
@@ -25,6 +21,11 @@ import {
 export interface IConfigStore {
   getCustomerConfig(customerId: string): Promise<Result<CustomerConfig, Error>>;
   saveCustomerConfig(config: CustomerConfig): Promise<Result<void, Error>>;
+  getCustomerConfigVersion(
+    customerId: string,
+    version: string
+  ): Promise<Result<CustomerConfig, Error>>;
+  listCustomerConfigVersions(customerId: string): Promise<Result<CustomerConfig[], Error>>;
   deleteCustomerConfig(customerId: string): Promise<Result<void, Error>>;
   listCustomerConfigs(): Promise<Result<CustomerConfig[], Error>>;
   getModuleConfig(customerId: string, moduleId: string): Promise<Result<ModuleConfig, Error>>;
@@ -43,7 +44,7 @@ export class DynamoDBConfigStore implements IConfigStore {
   private readonly tableName: string;
   private readonly logger: Logger;
   private readonly ddbDocClient: DynamoDBDocumentClient;
-  
+
   constructor(tableName: string, logger?: Logger) {
     this.tableName = tableName;
     // Initialize logger (existing code)
@@ -82,9 +83,7 @@ export class DynamoDBConfigStore implements IConfigStore {
         name === 'MissingAuthenticationToken' ||
         name === 'CredentialsError'
       ) {
-        return new Error(
-          `Access denied while attempting to ${action}. Verify IAM permissions.`
-        );
+        return new Error(`Access denied while attempting to ${action}. Verify IAM permissions.`);
       }
     }
     return error instanceof Error ? error : new Error(String(error));
@@ -149,9 +148,15 @@ export class DynamoDBConfigStore implements IConfigStore {
       Item: item,
     };
 
+    const versionParams = {
+      TableName: this.tableName,
+      Item: { ...item, SK: `CONFIG#${config.version}` },
+    };
+
     try {
       this.logger.debug('Attempting to put item into DynamoDB', params);
       await this.ddbDocClient.send(new PutCommand(params));
+      await this.ddbDocClient.send(new PutCommand(versionParams));
       this.logger.info('Customer configuration saved successfully', {
         customerId: config.customer_id,
         version: config.version,
@@ -161,6 +166,91 @@ export class DynamoDBConfigStore implements IConfigStore {
       const err = this.formatDynamoError('save customer configuration', error);
       this.logger.error('Failed to save customer configuration to DynamoDB', {
         customerId: config.customer_id,
+        error: err.message,
+        stack: err.stack,
+      });
+      return failure(err);
+    }
+  }
+
+  /**
+   * Retrieve a specific version of a customer configuration
+   */
+  async getCustomerConfigVersion(
+    customerId: string,
+    version: string
+  ): Promise<Result<CustomerConfig, Error>> {
+    this.logger.info('Getting customer configuration version', {
+      customerId,
+      version,
+    });
+
+    const params = {
+      TableName: this.tableName,
+      Key: { PK: `CUSTOMER#${customerId}`, SK: `CONFIG#${version}` },
+    };
+
+    try {
+      this.logger.debug('Attempting to get item from DynamoDB', params);
+      const { Item } = await this.ddbDocClient.send(new GetCommand(params));
+
+      if (!Item) {
+        this.logger.warn('Customer configuration version not found', {
+          customerId,
+          version,
+        });
+        return failure(new Error(`Customer configuration version not found: ${version}`));
+      }
+
+      this.logger.info('Customer configuration version retrieved', {
+        customerId,
+        version,
+      });
+      return success(Item as CustomerConfig);
+    } catch (error) {
+      const err = this.formatDynamoError('get customer configuration version', error);
+      this.logger.error('Failed to get customer configuration version', {
+        customerId,
+        version,
+        error: err.message,
+        stack: err.stack,
+      });
+      return failure(err);
+    }
+  }
+
+  /**
+   * List all versions of a customer configuration
+   */
+  async listCustomerConfigVersions(customerId: string): Promise<Result<CustomerConfig[], Error>> {
+    this.logger.info('Listing customer configuration versions', { customerId });
+
+    const params = {
+      TableName: this.tableName,
+      KeyConditionExpression: 'PK = :pk AND begins_with(SK, :prefix)',
+      ExpressionAttributeValues: {
+        ':pk': `CUSTOMER#${customerId}`,
+        ':prefix': 'CONFIG#',
+      },
+    };
+
+    try {
+      this.logger.debug('Querying configuration versions', params);
+      const { Items } = await this.ddbDocClient.send(new QueryCommand(params));
+
+      if (!Items) {
+        return success([]);
+      }
+
+      this.logger.info('Customer configuration versions retrieved', {
+        customerId,
+        count: Items.length,
+      });
+      return success(Items as CustomerConfig[]);
+    } catch (error) {
+      const err = this.formatDynamoError('list customer configuration versions', error);
+      this.logger.error('Failed to list configuration versions', {
+        customerId,
         error: err.message,
         stack: err.stack,
       });
@@ -217,7 +307,9 @@ export class DynamoDBConfigStore implements IConfigStore {
       if (!Items) {
         // This case might not be typical for Scan if the table exists,
         // an empty array would be more common.
-        this.logger.warn('No customer configurations found or error in scan operation that resulted in no Items array.');
+        this.logger.warn(
+          'No customer configurations found or error in scan operation that resulted in no Items array.'
+        );
         return success([]);
       }
 
@@ -238,7 +330,10 @@ export class DynamoDBConfigStore implements IConfigStore {
   /**
    * Get module configuration
    */
-  async getModuleConfig(customerId: string, moduleId: string): Promise<Result<ModuleConfig, Error>> {
+  async getModuleConfig(
+    customerId: string,
+    moduleId: string
+  ): Promise<Result<ModuleConfig, Error>> {
     this.logger.info('Getting module configuration', { customerId, moduleId });
 
     const params = {
@@ -293,7 +388,10 @@ export class DynamoDBConfigStore implements IConfigStore {
     try {
       this.logger.debug('Putting module item into DynamoDB', params);
       await this.ddbDocClient.send(new PutCommand(params));
-      this.logger.info('Module configuration saved successfully', { customerId, moduleId: config.module_id });
+      this.logger.info('Module configuration saved successfully', {
+        customerId,
+        moduleId: config.module_id,
+      });
       return success(undefined);
     } catch (error) {
       const err = this.formatDynamoError('save module configuration', error);
@@ -341,6 +439,7 @@ export class DynamoDBConfigStore implements IConfigStore {
  */
 export class MemoryConfigStore implements IConfigStore {
   private readonly configs = new Map<string, CustomerConfig>();
+  private readonly versions = new Map<string, CustomerConfig>();
   private readonly logger: Logger;
 
   constructor(logger?: Logger) {
@@ -383,6 +482,11 @@ export class MemoryConfigStore implements IConfigStore {
       updatedAt: new Date(),
     });
 
+    this.versions.set(
+      `${config.customer_id}:${config.version}`,
+      JSON.parse(JSON.stringify(config))
+    );
+
     return success(undefined);
   }
 
@@ -397,6 +501,29 @@ export class MemoryConfigStore implements IConfigStore {
     return success(undefined);
   }
 
+  async getCustomerConfigVersion(
+    customerId: string,
+    version: string
+  ): Promise<Result<CustomerConfig, Error>> {
+    const key = `${customerId}:${version}`;
+    const config = this.versions.get(key);
+    if (!config) {
+      return failure(new Error(`Customer configuration version not found: ${version}`));
+    }
+    return success({ ...config });
+  }
+
+  async listCustomerConfigVersions(customerId: string): Promise<Result<CustomerConfig[], Error>> {
+    const items: CustomerConfig[] = [];
+    const prefix = `${customerId}:`;
+    for (const [key, config] of this.versions.entries()) {
+      if (key.startsWith(prefix)) {
+        items.push({ ...config });
+      }
+    }
+    return success(items);
+  }
+
   async listCustomerConfigs(): Promise<Result<CustomerConfig[], Error>> {
     this.logger.info('Listing customer configurations from memory');
 
@@ -404,7 +531,10 @@ export class MemoryConfigStore implements IConfigStore {
     return success(configs);
   }
 
-  async getModuleConfig(customerId: string, moduleId: string): Promise<Result<ModuleConfig, Error>> {
+  async getModuleConfig(
+    customerId: string,
+    moduleId: string
+  ): Promise<Result<ModuleConfig, Error>> {
     const customerConfigResult = await this.getCustomerConfig(customerId);
     if (!customerConfigResult.success) {
       return customerConfigResult as Result<ModuleConfig, Error>;

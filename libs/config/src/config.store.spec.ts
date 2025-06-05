@@ -1,5 +1,11 @@
 import { DynamoDBConfigStore } from './config.store';
-import { DynamoDBDocumentClient, GetCommand, PutCommand, DeleteCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import {
+  DynamoDBDocumentClient,
+  GetCommand,
+  PutCommand,
+  DeleteCommand,
+  QueryCommand,
+} from '@aws-sdk/lib-dynamodb';
 import { mockClient } from 'aws-sdk-client-mock';
 import 'aws-sdk-client-mock-jest'; // For expect(mock).toHaveReceivedCommand()
 import type { CustomerConfig, ModuleConfig } from '@agent-desktop/types';
@@ -37,10 +43,12 @@ describe('DynamoDBConfigStore', () => {
         customer_id: mockCustomerId,
       });
 
-      ddbMock.on(GetCommand, {
-        TableName: tableName,
-        Key: { PK: `CUSTOMER#${mockCustomerId}`, SK: 'CONFIG' },
-      }).resolves({ Item: mockConfig });
+      ddbMock
+        .on(GetCommand, {
+          TableName: tableName,
+          Key: { PK: `CUSTOMER#${mockCustomerId}`, SK: 'CONFIG' },
+        })
+        .resolves({ Item: mockConfig });
 
       const result = await store.getCustomerConfig(mockCustomerId);
 
@@ -52,15 +60,19 @@ describe('DynamoDBConfigStore', () => {
         TableName: tableName,
         Key: { PK: `CUSTOMER#${mockCustomerId}`, SK: 'CONFIG' },
       });
-      expect(mockLogger.info).toHaveBeenCalledWith('Getting customer configuration', { customerId: mockCustomerId });
+      expect(mockLogger.info).toHaveBeenCalledWith('Getting customer configuration', {
+        customerId: mockCustomerId,
+      });
     });
 
     it('should return a failure if customer configuration is not found', async () => {
       const mockCustomerId = 'cust404';
-      ddbMock.on(GetCommand, {
-        TableName: tableName,
-        Key: { PK: `CUSTOMER#${mockCustomerId}`, SK: 'CONFIG' },
-      }).resolves({ Item: undefined }); // Simulate item not found
+      ddbMock
+        .on(GetCommand, {
+          TableName: tableName,
+          Key: { PK: `CUSTOMER#${mockCustomerId}`, SK: 'CONFIG' },
+        })
+        .resolves({ Item: undefined }); // Simulate item not found
 
       const result = await store.getCustomerConfig(mockCustomerId);
 
@@ -68,7 +80,9 @@ describe('DynamoDBConfigStore', () => {
       if (!result.success) {
         expect(result.error.message).toBe('Customer configuration not found');
       }
-      expect(mockLogger.warn).toHaveBeenCalledWith('Customer configuration not found', { customerId: mockCustomerId });
+      expect(mockLogger.warn).toHaveBeenCalledWith('Customer configuration not found', {
+        customerId: mockCustomerId,
+      });
     });
 
     it('should return a failure on DynamoDB error', async () => {
@@ -114,12 +128,21 @@ describe('DynamoDBConfigStore', () => {
         }),
       });
       // Verify the updatedAt is close to now
-      const actualItem = ddbMock.commandCalls(PutCommand)[0]?.args[0]?.input.Item as { updatedAt: string } | undefined;
+      const actualItem = ddbMock.commandCalls(PutCommand)[0]?.args[0]?.input.Item as
+        | { updatedAt: string }
+        | undefined;
       expect(actualItem).toBeDefined();
-      expect(new Date().getTime() - new Date(actualItem!['updatedAt']).getTime()).toBeLessThan(2000); // Within 2 seconds
-      expect(mockLogger.info).toHaveBeenCalledWith('Saving customer configuration',
+      expect(new Date().getTime() - new Date(actualItem!['updatedAt']).getTime()).toBeLessThan(
+        2000
+      ); // Within 2 seconds
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Saving customer configuration',
         expect.objectContaining({ customerId: mockCustomerId })
       );
+      // A second put is issued for the version item
+      expect(ddbMock.commandCalls(PutCommand).length).toBe(2);
+      const versionItem = ddbMock.commandCalls(PutCommand)[1]?.args[0]?.input.Item;
+      expect(versionItem.SK).toBe(`CONFIG#${mockConfig.version}`);
     });
 
     it('should return a failure on DynamoDB error during save', async () => {
@@ -138,14 +161,35 @@ describe('DynamoDBConfigStore', () => {
       );
     });
   });
+
+  describe('configuration versions', () => {
+    const customerId = 'custVer';
+    const config: CustomerConfig = (global as any).ConfigTestUtils.createMockConfig({
+      customer_id: customerId,
+      version: '1.0.0',
+    });
+
+    it('should retrieve a saved version', async () => {
+      ddbMock.on(GetCommand).resolves({ Item: config });
+      const result = await store.getCustomerConfigVersion(customerId, '1.0.0');
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data).toEqual(config);
+      expect(ddbMock).toHaveReceivedCommandWith(GetCommand, {
+        TableName: tableName,
+        Key: { PK: `CUSTOMER#${customerId}`, SK: 'CONFIG#1.0.0' },
+      });
+    });
+  });
   describe('deleteCustomerConfig', () => {
     const mockCustomerId = 'custDelete123';
 
     it('should successfully delete a customer configuration', async () => {
-      ddbMock.on(DeleteCommand, {
-        TableName: tableName,
-        Key: { PK: `CUSTOMER#${mockCustomerId}`, SK: 'CONFIG' },
-      }).resolves({}); // Simulate successful delete
+      ddbMock
+        .on(DeleteCommand, {
+          TableName: tableName,
+          Key: { PK: `CUSTOMER#${mockCustomerId}`, SK: 'CONFIG' },
+        })
+        .resolves({}); // Simulate successful delete
 
       const result = await store.deleteCustomerConfig(mockCustomerId);
 
@@ -154,16 +198,22 @@ describe('DynamoDBConfigStore', () => {
         TableName: tableName,
         Key: { PK: `CUSTOMER#${mockCustomerId}`, SK: 'CONFIG' },
       });
-      expect(mockLogger.info).toHaveBeenCalledWith('Deleting customer configuration', { customerId: mockCustomerId });
-      expect(mockLogger.info).toHaveBeenCalledWith('Customer configuration deleted successfully', { customerId: mockCustomerId });
+      expect(mockLogger.info).toHaveBeenCalledWith('Deleting customer configuration', {
+        customerId: mockCustomerId,
+      });
+      expect(mockLogger.info).toHaveBeenCalledWith('Customer configuration deleted successfully', {
+        customerId: mockCustomerId,
+      });
     });
 
     it('should return a failure on DynamoDB error during delete', async () => {
       const dbError = new Error('DynamoDB delete blew up');
-      ddbMock.on(DeleteCommand, {
-        TableName: tableName,
-        Key: { PK: `CUSTOMER#${mockCustomerId}`, SK: 'CONFIG' },
-      }).rejects(dbError);
+      ddbMock
+        .on(DeleteCommand, {
+          TableName: tableName,
+          Key: { PK: `CUSTOMER#${mockCustomerId}`, SK: 'CONFIG' },
+        })
+        .rejects(dbError);
 
       const result = await store.deleteCustomerConfig(mockCustomerId);
 
@@ -213,7 +263,9 @@ describe('DynamoDBConfigStore', () => {
         },
       });
       expect(mockLogger.info).toHaveBeenCalledWith('Listing all customer configurations');
-      expect(mockLogger.info).toHaveBeenCalledWith('Customer configurations listed successfully', { count: mockItems.length });
+      expect(mockLogger.info).toHaveBeenCalledWith('Customer configurations listed successfully', {
+        count: mockItems.length,
+      });
     });
 
     it('should return an empty list if no configurations are found', async () => {
@@ -226,21 +278,27 @@ describe('DynamoDBConfigStore', () => {
         expect(result.data).toEqual([]);
         expect(result.data.length).toBe(0);
       }
-      expect(mockLogger.info).toHaveBeenCalledWith('Customer configurations listed successfully', { count: 0 });
+      expect(mockLogger.info).toHaveBeenCalledWith('Customer configurations listed successfully', {
+        count: 0,
+      });
     });
 
     it('should return success with an empty list if Items is undefined in response (as per current code handling)', async () => {
-       // This test reflects the current implementation detail where `!Items` leads to `success([])`
-       ddbMock.on(QueryCommand).resolves({ Items: undefined, Count: 0 });
+      // This test reflects the current implementation detail where `!Items` leads to `success([])`
+      ddbMock.on(QueryCommand).resolves({ Items: undefined, Count: 0 });
 
-       const result = await store.listCustomerConfigs();
+      const result = await store.listCustomerConfigs();
 
-       expect(result.success).toBe(true);
-       if (result.success) {
-           expect(result.data).toEqual([]);
-       }
-       expect(mockLogger.warn).toHaveBeenCalledWith('No customer configurations found or error in scan operation that resulted in no Items array.');
-       expect(mockLogger.info).toHaveBeenCalledWith('Customer configurations listed successfully', { count: 0 });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).toEqual([]);
+      }
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'No customer configurations found or error in scan operation that resulted in no Items array.'
+      );
+      expect(mockLogger.info).toHaveBeenCalledWith('Customer configurations listed successfully', {
+        count: 0,
+      });
     });
 
     it('should return a failure on DynamoDB error during scan', async () => {
@@ -274,12 +332,20 @@ describe('DynamoDBConfigStore', () => {
     };
 
     it('should retrieve a module', async () => {
-      ddbMock.on(GetCommand, { TableName: tableName, Key: { PK: `CUSTOMER#${customerId}`, SK: `MODULE#${moduleId}` } }).resolves({ Item: mockModule });
+      ddbMock
+        .on(GetCommand, {
+          TableName: tableName,
+          Key: { PK: `CUSTOMER#${customerId}`, SK: `MODULE#${moduleId}` },
+        })
+        .resolves({ Item: mockModule });
 
       const result = await store.getModuleConfig(customerId, moduleId);
       expect(result.success).toBe(true);
       if (result.success) expect(result.data).toEqual(mockModule);
-      expect(ddbMock).toHaveReceivedCommandWith(GetCommand, { TableName: tableName, Key: { PK: `CUSTOMER#${customerId}`, SK: `MODULE#${moduleId}` } });
+      expect(ddbMock).toHaveReceivedCommandWith(GetCommand, {
+        TableName: tableName,
+        Key: { PK: `CUSTOMER#${customerId}`, SK: `MODULE#${moduleId}` },
+      });
     });
 
     it('should return failure when not found', async () => {
@@ -314,7 +380,13 @@ describe('DynamoDBConfigStore', () => {
       ddbMock.on(PutCommand).resolves({});
       const result = await store.saveModuleConfig(customerId, moduleConfig);
       expect(result.success).toBe(true);
-      expect(ddbMock).toHaveReceivedCommandWith(PutCommand, { TableName: tableName, Item: expect.objectContaining({ PK: `CUSTOMER#${customerId}`, SK: `MODULE#${moduleConfig.module_id}` }) });
+      expect(ddbMock).toHaveReceivedCommandWith(PutCommand, {
+        TableName: tableName,
+        Item: expect.objectContaining({
+          PK: `CUSTOMER#${customerId}`,
+          SK: `MODULE#${moduleConfig.module_id}`,
+        }),
+      });
     });
 
     it('should fail on DynamoDB error', async () => {
@@ -334,7 +406,10 @@ describe('DynamoDBConfigStore', () => {
       ddbMock.on(DeleteCommand).resolves({});
       const result = await store.deleteModuleConfig(customerId, moduleId);
       expect(result.success).toBe(true);
-      expect(ddbMock).toHaveReceivedCommandWith(DeleteCommand, { TableName: tableName, Key: { PK: `CUSTOMER#${customerId}`, SK: `MODULE#${moduleId}` } });
+      expect(ddbMock).toHaveReceivedCommandWith(DeleteCommand, {
+        TableName: tableName,
+        Key: { PK: `CUSTOMER#${customerId}`, SK: `MODULE#${moduleId}` },
+      });
     });
 
     it('should handle DynamoDB error', async () => {

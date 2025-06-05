@@ -10,6 +10,7 @@ A modern, modular Contact Control Panel (CCP) desktop application for Amazon Con
 ## 🌟 Features
 
 ### Core Contact Center Capabilities
+
 - **Multi-channel Support**: Voice, chat, and task management
 - **Real-time Call Controls**: Accept, decline, hold, mute, transfer, conference
 - **Customer Information Panel**: Comprehensive contact details and history
@@ -18,6 +19,7 @@ A modern, modular Contact Control Panel (CCP) desktop application for Amazon Con
 - **Queue Dashboard**: Real-time metrics and performance monitoring
 
 ### Enterprise Features
+
 - **VDI Optimization**: Optimized for Citrix, VMware Horizon, AWS WorkSpaces
 - **Flexible Audio Modes**: Local, mobile browser, and VDI audio paths
 - **Modular Architecture**: Customer-specific feature enablement
@@ -27,6 +29,7 @@ A modern, modular Contact Control Panel (CCP) desktop application for Amazon Con
 - **Audit Logging**: SOC 2 and HIPAA compliance support
 
 ### Technical Excellence
+
 - **Modern Stack**: React 18, TypeScript 5.2+, Vite, Tailwind CSS
 - **Real-time Updates**: WebSocket integration for live data
 - **Performance**: Optimized for low-latency VDI environments
@@ -36,6 +39,7 @@ A modern, modular Contact Control Panel (CCP) desktop application for Amazon Con
 ## 🏗️ Architecture
 
 ### Monorepo Structure
+
 ```
 agent-desktop/
 ├── apps/
@@ -58,6 +62,7 @@ agent-desktop/
 ```
 
 ### Component Architecture
+
 - **Modular Design**: Each feature as independent module
 - **State Management**: Zustand with Immer for immutable updates
 - **Component Library**: Headless UI + Tailwind CSS
@@ -66,11 +71,13 @@ agent-desktop/
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - Node.js 20+ LTS
 - pnpm 8+
 - Git
 
 ### Installation
+
 ```bash
 # Clone the repository
 git clone https://github.com/Brownster/agent-desktop.git
@@ -84,6 +91,7 @@ pnpm nx serve ccp-client
 ```
 
 ### Development Commands
+
 ```bash
 # Development
 pnpm nx serve ccp-client          # Start CCP client
@@ -111,6 +119,7 @@ The main contact center application with full Amazon Connect integration.
 ### ✅ Completed Components
 
 #### 🎯 Call Controls (`CallControls.tsx`)
+
 - Accept/decline incoming calls with visual feedback
 - Hold/resume with status indicators
 - Mute/unmute with audio state management
@@ -119,6 +128,7 @@ The main contact center application with full Amazon Connect integration.
 - Support for voice, chat, and task contacts
 
 #### 👤 Contact Information Panel (`ContactInfo.tsx`)
+
 - Customer details with formatted phone numbers
 - Contact timeline and interaction history
 - Dynamic attribute display with type detection
@@ -128,6 +138,7 @@ The main contact center application with full Amazon Connect integration.
 - Available as a standalone module via `@agent-desktop/customer-info`
 
 #### 📞 DTMF Dialpad (`Dialpad.tsx`)
+
 - Interactive dialpad with audio tone generation
 - Dual-tone multi-frequency (DTMF) support
 - Phone number formatting and validation
@@ -136,6 +147,7 @@ The main contact center application with full Amazon Connect integration.
 - Audio enable/disable controls
 
 #### 💬 Chat Interface (`ChatInterface.tsx`)
+
 - Real-time messaging with typing indicators
 - File attachment support with preview
 - Message status tracking (sent/delivered/read)
@@ -144,6 +156,7 @@ The main contact center application with full Amazon Connect integration.
 - Rich text formatting support
 
 #### 📊 Queue Dashboard (`QueueDashboard.tsx`)
+
 - Real-time queue metrics and KPIs
 - Service level monitoring with thresholds
 - Agent availability tracking
@@ -154,6 +167,7 @@ The main contact center application with full Amazon Connect integration.
 ### 🔧 Core Services
 
 #### 🌐 ConnectService (`connect.service.ts`)
+
 - **Amazon Connect Integration**: Complete CCP integration with Streams API
 - **Agent State Management**: Available, unavailable, ACW, offline states
 - **Contact Lifecycle**: Full contact handling from incoming to destruction
@@ -163,12 +177,14 @@ The main contact center application with full Amazon Connect integration.
 - **VDI Optimization**: Optimized for virtual desktop environments
 
 ### 🏪 State Management
+
 - **Contact Store**: Active contact management
 - **Agent Store**: Agent state and availability
 - **Queue Store**: Real-time queue statistics
 - **Configuration Store**: Customer-specific settings
 
 ### 🎨 UI/UX Features
+
 - Responsive design for various screen sizes
 - Dark/light theme support (configurable)
 - Accessibility features (ARIA labels, keyboard navigation)
@@ -179,6 +195,7 @@ The main contact center application with full Amazon Connect integration.
 ## 🛠️ Technology Stack
 
 ### Frontend
+
 - **React 18**: Modern React with hooks and concurrent features
 - **TypeScript 5.2+**: Strict typing with latest features
 - **Vite**: Fast build tool with HMR
@@ -188,12 +205,14 @@ The main contact center application with full Amazon Connect integration.
 - **React Hook Form**: Form handling with validation
 
 ### Backend Integration
+
 - **Amazon Connect Streams**: Official Amazon Connect SDK
 - **WebSocket**: Real-time data synchronization
 - **REST APIs**: Configuration and data services
 - **AWS SDK**: Cloud service integration
 
 ### Development Tools
+
 - **Nx**: Monorepo management and build system
 - **ESLint**: Code linting with TypeScript rules
 - **Prettier**: Code formatting
@@ -204,6 +223,7 @@ The main contact center application with full Amazon Connect integration.
 ## 🔧 Configuration
 
 ### Environment Variables
+
 ```bash
 # Amazon Connect Configuration
 VITE_CONNECT_INSTANCE_URL=https://your-instance.awsapps.com/connect/ccp-v2
@@ -220,7 +240,13 @@ VITE_ENABLE_RECORDING=true
 ```
 
 ### Customer Configuration
-Customer-specific configurations are managed through DynamoDB:
+
+Customer-specific configurations are managed through DynamoDB. In production
+the configuration service automatically uses the DynamoDB store while
+development falls back to an in-memory implementation. Configuration changes
+are pushed in real time over WebSocket and each saved version is retained for
+easy rollback:
+
 ```typescript
 interface CustomerConfig {
   customer_id: string;
@@ -235,16 +261,19 @@ interface CustomerConfig {
 ## 🚀 Deployment
 
 ### Staging Deployment
+
 ```bash
 pnpm nx deploy:staging ccp-client
 ```
 
 ### Production Deployment
+
 ```bash
 pnpm nx deploy:prod ccp-client
 ```
 
 ### Infrastructure
+
 - **AWS S3 + CloudFront**: Static site hosting
 - **AWS Lambda**: API backend
 - **DynamoDB**: Configuration storage
@@ -253,26 +282,30 @@ pnpm nx deploy:prod ccp-client
 ## 🧪 Testing
 
 ### Comprehensive Test Coverage
+
 The application has extensive test coverage across all major components and services:
 
 #### Service Testing
+
 - **ConnectService**: 36 comprehensive tests covering CCP integration, agent state management, contact lifecycle, error handling, and store integration
 - **Mock Strategy**: Complete Amazon Connect API mocking with realistic event simulation
 - **Edge Cases**: Comprehensive error scenarios and recovery testing
 
 #### Component Testing
+
 - **React Components**: Unit tests for all UI components with React Testing Library
 - **User Interactions**: Event handling, state changes, and accessibility testing
 - **Integration Tests**: Component interaction with stores and services
 
 ### Test Commands
+
 ```bash
 # Unit Tests
 pnpm nx test ccp-client              # Run all unit tests
 pnpm nx test:coverage ccp-client     # With coverage report
 pnpm nx test ccp-client --testPathPattern=connect.service.test.ts  # Specific service tests
 
-# Integration Tests  
+# Integration Tests
 pnpm nx test:integration ccp-client  # Cross-component integration tests
 
 # End-to-End Tests
@@ -280,21 +313,25 @@ pnpm nx e2e ccp-client-e2e          # Full application E2E testing
 ```
 
 ### Test Statistics
+
 - **Service Tests**: 36 passing tests for ConnectService
-- **Component Tests**: Comprehensive coverage for all UI components  
+- **Component Tests**: Comprehensive coverage for all UI components
 - **Integration Tests**: Store and service integration validation
 - **Overall Coverage**: 80%+ code coverage maintained
 
 ### VDI Testing
+
 Special focus on testing in virtual desktop environments:
+
 - Citrix Workspace
-- VMware Horizon  
+- VMware Horizon
 - AWS WorkSpaces
 - Azure Virtual Desktop
 
 ## 📈 Performance
 
 ### Optimization Features
+
 - **Code Splitting**: Dynamic imports for large modules
 - **Tree Shaking**: Unused code elimination
 - **Asset Optimization**: Image and font optimization
@@ -302,6 +339,7 @@ Special focus on testing in virtual desktop environments:
 - **Service Workers**: Offline capability and caching
 
 ### VDI-Specific Optimizations
+
 - Audio path optimization for virtual environments
 - Reduced network calls and bandwidth usage
 - Optimized rendering for remote desktop protocols
@@ -310,6 +348,7 @@ Special focus on testing in virtual desktop environments:
 ## 🔐 Security
 
 ### Security Measures
+
 - Content Security Policy (CSP) implementation
 - Cross-Origin Resource Sharing (CORS) configuration
 - AWS IAM roles and permissions
@@ -317,6 +356,7 @@ Special focus on testing in virtual desktop environments:
 - Audit logging for compliance
 
 ### Compliance
+
 - SOC 2 Type II compliance ready
 - HIPAA compliance support
 - GDPR data protection measures
@@ -325,6 +365,7 @@ Special focus on testing in virtual desktop environments:
 ## 🤝 Contributing
 
 ### Development Workflow
+
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/amazing-feature`
 3. Commit changes: `git commit -m 'Add amazing feature'`
@@ -332,6 +373,7 @@ Special focus on testing in virtual desktop environments:
 5. Open a Pull Request
 
 ### Code Standards
+
 - Follow TypeScript strict mode requirements
 - Maintain 80%+ test coverage
 - Use conventional commit messages
@@ -339,6 +381,7 @@ Special focus on testing in virtual desktop environments:
 - Follow accessibility guidelines (WCAG 2.1 AA)
 
 ### Pull Request Process
+
 1. Ensure all tests pass
 2. Update documentation for API changes
 3. Add/update tests for new functionality
@@ -350,6 +393,7 @@ Special focus on testing in virtual desktop environments:
 See [ROADMAP.md](./ROADMAP.md) for detailed feature planning and timeline.
 
 ### Phase 1: Core Foundation ✅
+
 - ✅ Project setup and architecture
 - ✅ Core CCP components (call controls, contact info, dialpad)
 - ✅ Chat interface with messaging
@@ -357,6 +401,7 @@ See [ROADMAP.md](./ROADMAP.md) for detailed feature planning and timeline.
 - ✅ State management with Zustand
 
 ### Phase 2: Enterprise Features (Q2 2024)
+
 - [ ] Admin dashboard for configuration
 - [ ] Module system with dynamic loading
 - [ ] Multi-tenant customer management
@@ -364,6 +409,7 @@ See [ROADMAP.md](./ROADMAP.md) for detailed feature planning and timeline.
 - [ ] VDI optimization and testing
 
 ### Phase 3: Advanced Capabilities (Q3 2024)
+
 - [ ] AI-powered agent assistance
 - [ ] Advanced workforce management
 - [ ] Custom scripting and automation
@@ -373,12 +419,14 @@ See [ROADMAP.md](./ROADMAP.md) for detailed feature planning and timeline.
 ## 🐛 Known Issues
 
 ### Current Limitations
+
 1. TypeScript build errors in existing store files (in progress)
 2. Library dependencies need proper package.json setup
 3. ESLint configuration needs workspace updates
 4. AWS infrastructure deployment scripts needed
 
 ### Workarounds
+
 - Use `--skipLibCheck` for TypeScript compilation
 - Manual dependency resolution for workspace packages
 - Individual project linting instead of workspace-wide

@@ -57,6 +57,7 @@ export interface IConfigService {
   validate(config: Record<string, unknown>): ConfigValidationResult;
   loadCustomerConfig(customerId: string): Promise<Result<CustomerConfig, Error>>;
   saveCustomerConfig(config: CustomerConfig): Promise<Result<void, Error>>;
+  rollbackCustomerConfig(customerId: string, version: string): Promise<Result<void, Error>>;
   getEnvironmentConfig(): AppConfig;
 }
 
@@ -99,13 +100,14 @@ const DEFAULT_OPTIONS: ConfigServiceOptions = {
   ],
   enableWebSocket: true,
   webSocketOptions: {},
-  storeType: 'memory',
+  // Automatically use DynamoDB in production unless overridden
+  storeType: process.env['NODE_ENV'] === 'production' ? 'dynamodb' : 'memory',
   dynamoTableName: process.env['CONFIG_TABLE_NAME'] || 'ccp-config',
 };
 
 /**
  * Enterprise configuration service
- * 
+ *
  * Features:
  * - Hierarchical configuration management
  * - Multiple configuration sources
@@ -125,25 +127,29 @@ export class ConfigService implements IConfigService {
   private readonly validator: ConfigValidator;
   private readonly store: IConfigStore;
   private readonly webSocket?: ConfigWebSocketService;
+  private readonly subscriptions = new Map<string, () => void>();
 
   /**
    * Create a new configuration service
-   * 
+   *
    * @param options - Service configuration options
    */
   constructor(options: Partial<ConfigServiceOptions> = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
 
     // Initialize logger - can be undefined if options.logger is not provided
-    this.logger = this.options.logger ? this.options.logger.createChild('ConfigService') : undefined;
-    
+    this.logger = this.options.logger
+      ? this.options.logger.createChild('ConfigService')
+      : undefined;
+
     // Initialize validator
     this.validator = new ConfigValidator();
-    
+
     // Initialize store
     if (this.options.storeType === 'dynamodb') {
       if (!this.options.dynamoTableName || this.options.dynamoTableName.trim() === '') {
-        const errorMessage = 'DynamoDB store type selected but dynamoTableName is not configured. Please provide a valid table name in ConfigServiceOptions or via the CONFIG_TABLE_NAME environment variable.';
+        const errorMessage =
+          'DynamoDB store type selected but dynamoTableName is not configured. Please provide a valid table name in ConfigServiceOptions or via the CONFIG_TABLE_NAME environment variable.';
         this.logger?.error(errorMessage); // Log before throwing for better context if logger exists
         throw new Error(errorMessage);
       }
@@ -168,24 +174,27 @@ export class ConfigService implements IConfigService {
       // So, we pass this.logger which can be undefined.
       this.store = new MemoryConfigStore(this.logger);
     }
-    
+
     // Initialize WebSocket service if enabled
-    if (this.options.enableWebSocket) { // WebSocket can be initialized even if logger is not present
+    if (this.options.enableWebSocket) {
+      // WebSocket can be initialized even if logger is not present
       this.webSocket = new ConfigWebSocketService(
         this.options.webSocketOptions,
         this.logger // Pass potentially undefined logger
       );
-      
+
       // Auto-connect WebSocket
       this.webSocket.connect().catch(error => {
         // Use console.warn if logger is not available for this specific error message
-        const logWarn = this.logger ? this.logger.warn : (msg: string, ctx?:any) => console.warn(msg, ctx || '');
+        const logWarn = this.logger
+          ? this.logger.warn
+          : (msg: string, ctx?: any) => console.warn(msg, ctx || '');
         logWarn('Failed to connect to WebSocket server', {
           error: error instanceof Error ? error.message : String(error),
         });
       });
     }
-    
+
     this.logger?.debug('ConfigService initialized', {
       enableWatching: this.options.enableWatching,
       enableValidation: this.options.enableValidation,
@@ -198,7 +207,7 @@ export class ConfigService implements IConfigService {
 
   /**
    * Get a configuration value by key with dot-notation support
-   * 
+   *
    * @param key - Configuration key (supports dot notation like 'app.database.host')
    * @returns Configuration value or undefined if not found
    */
@@ -221,8 +230,8 @@ export class ConfigService implements IConfigService {
       this.setCachedValue(key, value);
     }
 
-    this.logger?.debug('Configuration value retrieved', { 
-      key, 
+    this.logger?.debug('Configuration value retrieved', {
+      key,
       found: value !== undefined,
       type: typeof value,
     });
@@ -232,14 +241,14 @@ export class ConfigService implements IConfigService {
 
   /**
    * Set a configuration value
-   * 
+   *
    * @param key - Configuration key
    * @param value - Configuration value
    * @param source - Configuration source
    */
   set(key: string, value: unknown, source: ConfigSource = ConfigSource.OVERRIDE): void {
-    this.logger?.debug('Setting configuration value', { 
-      key, 
+    this.logger?.debug('Setting configuration value', {
+      key,
       value: typeof value === 'object' ? '[Object]' : value,
       source,
     });
@@ -265,8 +274,8 @@ export class ConfigService implements IConfigService {
       this.notifyWatchers(key, event);
     }
 
-    this.logger?.info('Configuration value updated', { 
-      key, 
+    this.logger?.info('Configuration value updated', {
+      key,
       source,
       hasOldValue: oldValue !== undefined,
     });
@@ -274,7 +283,7 @@ export class ConfigService implements IConfigService {
 
   /**
    * Check if a configuration key exists
-   * 
+   *
    * @param key - Configuration key
    * @returns True if key exists, false otherwise
    */
@@ -286,7 +295,7 @@ export class ConfigService implements IConfigService {
 
   /**
    * Delete a configuration key
-   * 
+   *
    * @param key - Configuration key to delete
    * @returns True if key was deleted, false if it didn't exist
    */
@@ -328,19 +337,19 @@ export class ConfigService implements IConfigService {
 
   /**
    * Get all configuration values
-   * 
+   *
    * @returns All configuration values as a flat object
    */
   getAll(): Record<string, unknown> {
     this.logger?.debug('Getting all configuration values');
-    
+
     const result: Record<string, unknown> = {};
-    
+
     for (const [key, value] of this.config.entries()) {
       result[key] = value;
     }
 
-    this.logger?.debug('Retrieved all configuration values', { 
+    this.logger?.debug('Retrieved all configuration values', {
       count: Object.keys(result).length,
     });
 
@@ -376,14 +385,14 @@ export class ConfigService implements IConfigService {
       }
     }
 
-    this.logger?.warn('All configuration values cleared', { 
+    this.logger?.warn('All configuration values cleared', {
       clearedCount: oldKeys.length,
     });
   }
 
   /**
    * Watch for configuration changes
-   * 
+   *
    * @param key - Configuration key to watch (supports wildcards)
    * @param callback - Callback function to invoke on changes
    * @returns Unwatch function
@@ -403,8 +412,8 @@ export class ConfigService implements IConfigService {
     const watcherSet = this.watchers.get(key)!;
     watcherSet.add(callback);
 
-    this.logger?.debug('Configuration watcher added', { 
-      key, 
+    this.logger?.debug('Configuration watcher added', {
+      key,
       watcherCount: watcherSet.size,
     });
 
@@ -412,12 +421,12 @@ export class ConfigService implements IConfigService {
     return () => {
       this.logger?.debug('Removing configuration watcher', { key });
       watcherSet.delete(callback);
-      
+
       if (watcherSet.size === 0) {
         this.watchers.delete(key);
       }
 
-      this.logger?.debug('Configuration watcher removed', { 
+      this.logger?.debug('Configuration watcher removed', {
         key,
         remainingWatchers: watcherSet.size,
       });
@@ -426,7 +435,7 @@ export class ConfigService implements IConfigService {
 
   /**
    * Validate configuration against schema
-   * 
+   *
    * @param config - Configuration object to validate
    * @returns Validation result with errors and warnings
    */
@@ -466,7 +475,7 @@ export class ConfigService implements IConfigService {
 
   /**
    * Load customer-specific configuration
-   * 
+   *
    * @param customerId - Customer identifier
    * @returns Promise resolving to customer configuration or error
    */
@@ -475,25 +484,22 @@ export class ConfigService implements IConfigService {
 
     try {
       const result = await this.store.getCustomerConfig(customerId);
-      
+
       if (result.success) {
-        this.logger?.info('Customer configuration loaded successfully', { 
+        this.logger?.info('Customer configuration loaded successfully', {
           customerId,
           moduleCount: result.data.modules.length,
           integrationCount: result.data.integrations.length,
         });
 
         // Subscribe to real-time updates for this customer
-        if (this.webSocket) {
-          this.webSocket.subscribe(customerId, undefined, (event) => {
-            this.logger?.info('Received real-time configuration update', {
-              customerId,
-              key: event.key,
-            });
-            
-            // Update local cache
-            this.set(event.key, event.newValue, event.source);
-          });
+        if (this.webSocket && !this.subscriptions.has(customerId)) {
+          const unsubscribe = this.webSocket.subscribe(
+            customerId,
+            undefined,
+            this.handleRemoteChange
+          );
+          this.subscriptions.set(customerId, unsubscribe);
         }
       }
 
@@ -510,7 +516,7 @@ export class ConfigService implements IConfigService {
 
   /**
    * Save customer-specific configuration
-   * 
+   *
    * @param config - Customer configuration to save
    * @returns Promise resolving to success or error
    */
@@ -523,9 +529,11 @@ export class ConfigService implements IConfigService {
     try {
       // Validate configuration before saving
       const validationResult = this.validator.validateCustomerConfig(config);
-      
+
       if (!validationResult.isValid) {
-        const error = new Error(`Configuration validation failed: ${validationResult.errors[0]?.message}`);
+        const error = new Error(
+          `Configuration validation failed: ${validationResult.errors[0]?.message}`
+        );
         this.logger?.error('Customer configuration validation failed', {
           customerId: config.customer_id,
           errorCount: validationResult.errors.length,
@@ -569,15 +577,32 @@ export class ConfigService implements IConfigService {
   }
 
   /**
+   * Roll back customer configuration to a previous version
+   */
+  async rollbackCustomerConfig(customerId: string, version: string): Promise<Result<void, Error>> {
+    this.logger?.info('Rolling back customer configuration', {
+      customerId,
+      version,
+    });
+
+    const versionResult = await this.store.getCustomerConfigVersion(customerId, version);
+    if (!versionResult.success) {
+      return failure(versionResult.error);
+    }
+
+    return this.saveCustomerConfig(versionResult.data);
+  }
+
+  /**
    * Get environment-specific configuration
-   * 
+   *
    * @returns Application configuration for current environment
    */
   getEnvironmentConfig(): AppConfig {
     this.logger?.debug('Getting environment configuration');
 
     const environment = (process.env['NODE_ENV'] as Environment) || 'development';
-    
+
     const config: AppConfig = {
       id: 'app-config',
       version: '1.0.0',
@@ -611,7 +636,7 @@ export class ConfigService implements IConfigService {
     if (key.includes('.')) {
       return this.getNestedValue<T>(key);
     }
-    
+
     return this.config.get(key) as T | undefined;
   }
 
@@ -633,7 +658,7 @@ export class ConfigService implements IConfigService {
     if (key.includes('.')) {
       return this.deleteNestedValue(key);
     }
-    
+
     return this.config.delete(key);
   }
 
@@ -650,12 +675,12 @@ export class ConfigService implements IConfigService {
     }
 
     let current: unknown = rootValue;
-    
+
     for (let i = 1; i < parts.length; i++) {
       if (current === null || typeof current !== 'object') {
         return undefined;
       }
-      
+
       const part = parts[i]!;
       current = (current as Record<string, unknown>)[part];
     }
@@ -669,7 +694,7 @@ export class ConfigService implements IConfigService {
   private setNestedValue(key: string, value: unknown): void {
     const parts = key.split('.');
     const rootKey = parts[0]!;
-    
+
     let rootValue = this.config.get(rootKey);
     if (rootValue === undefined || typeof rootValue !== 'object' || rootValue === null) {
       rootValue = {};
@@ -677,14 +702,18 @@ export class ConfigService implements IConfigService {
     }
 
     let current = rootValue as Record<string, unknown>;
-    
+
     for (let i = 1; i < parts.length - 1; i++) {
       const part = parts[i]!;
-      
-      if (current[part] === undefined || typeof current[part] !== 'object' || current[part] === null) {
+
+      if (
+        current[part] === undefined ||
+        typeof current[part] !== 'object' ||
+        current[part] === null
+      ) {
         current[part] = {};
       }
-      
+
       current = current[part] as Record<string, unknown>;
     }
 
@@ -704,14 +733,18 @@ export class ConfigService implements IConfigService {
     }
 
     let current = rootValue as Record<string, unknown>;
-    
+
     for (let i = 1; i < parts.length - 1; i++) {
       const part = parts[i]!;
-      
-      if (current[part] === undefined || typeof current[part] !== 'object' || current[part] === null) {
+
+      if (
+        current[part] === undefined ||
+        typeof current[part] !== 'object' ||
+        current[part] === null
+      ) {
         return false;
       }
-      
+
       current = current[part] as Record<string, unknown>;
     }
 
@@ -729,7 +762,7 @@ export class ConfigService implements IConfigService {
    */
   private getCachedValue<T>(key: string): T | undefined {
     const cached = this.cache.get(key);
-    
+
     if (cached && cached.expires > Date.now()) {
       return cached.value as T | undefined;
     }
@@ -835,12 +868,21 @@ export class ConfigService implements IConfigService {
   }
 
   /**
+   * Apply configuration changes received from WebSocket
+   */
+  private handleRemoteChange = (event: ConfigChangeEvent): void => {
+    this.logger?.info('Applying remote configuration change', {
+      key: event.key,
+      source: event.source,
+    });
+    this.set(event.key, event.newValue, ConfigSource.REMOTE);
+  };
+
+  /**
    * Check if a key matches a wildcard pattern
    */
   private matchesWildcard(key: string, pattern: string): boolean {
-    const regex = new RegExp(
-      '^' + pattern.replace(/\*/g, '.*').replace(/\?/g, '.') + '$'
-    );
+    const regex = new RegExp('^' + pattern.replace(/\*/g, '.*').replace(/\?/g, '.') + '$');
     return regex.test(key);
   }
 }
