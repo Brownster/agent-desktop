@@ -283,4 +283,4 @@ VITE_ENVIRONMENT=production pnpm build
 
 ## License
 
-This project is proprietary software developed for Amazon Connect CCP configuration management.
+This project is licensed under the MIT License - see the [LICENSE](../../LICENSE) file for details.

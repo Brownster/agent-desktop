@@ -98,7 +98,7 @@
     "modular"
   ],
   "author": "Agent Desktop Team",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/agent-desktop/agent-desktop.git"
