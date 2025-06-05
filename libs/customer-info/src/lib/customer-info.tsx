@@ -1,1 +1,1 @@
-export { default } from '../../../../apps/ccp-client/src/components/ContactInfo';
+export { ContactInfo as default } from '@agent-desktop/ccp-client';

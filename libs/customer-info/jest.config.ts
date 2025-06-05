@@ -9,6 +9,7 @@ module.exports = {
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
   coverageDirectory: '../../coverage/libs/customer-info',
   moduleNameMapper: {
+    '^@agent-desktop/ccp-client$': '<rootDir>/../../apps/ccp-client/src/index.ts',
     '^@/(.*)$': '<rootDir>/../../apps/ccp-client/src/$1',
   },
 };

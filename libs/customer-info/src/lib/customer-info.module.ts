@@ -1,6 +1,6 @@
 import type { ModuleConfig, ModuleID } from '@agent-desktop/types';
 import { BaseModule, ModuleLoadStrategy, type ModuleMetadata } from '@agent-desktop/core';
-import ContactInfo from '../../../../apps/ccp-client/src/components/ContactInfo';
+import { ContactInfo } from '@agent-desktop/ccp-client';
 import type { ComponentType } from 'react';
 
 export const DEFAULT_CUSTOMER_INFO_CONFIG: ModuleConfig = {
