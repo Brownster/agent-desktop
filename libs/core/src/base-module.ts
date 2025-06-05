@@ -66,6 +66,8 @@ export interface ModuleMetadata {
   readonly position: string;
   readonly priority: number;
   readonly tags: readonly string[];
+  readonly minAppVersion?: string;
+  readonly maxAppVersion?: string;
 }
 
 /**
