@@ -13,6 +13,9 @@ Enterprise configuration management library with validation, watching, caching, 
 - **Environment Support**: Environment-specific configuration management
 - **Type Safety**: Full TypeScript support with strict typing
 - **Enterprise Features**: Logging, error handling, and monitoring integration
+- **Production Storage**: Automatically uses DynamoDB in production
+- **WebSocket Updates**: Real-time configuration change notifications
+- **Version History**: Retrieve previous versions and rollback
 
 ## Quick Start
 
@@ -229,6 +232,16 @@ if (saveResult.success) {
   console.log('Customer configuration saved successfully');
 } else {
   console.error('Failed to save:', saveResult.error);
+}
+```
+
+### Rolling Back Configuration
+
+```typescript
+// Roll back to a previous version
+const result = await config.rollbackCustomerConfig('acme-corp', '1.1.0');
+if (result.success) {
+  console.log('Rolled back to 1.1.0');
 }
 ```
 
