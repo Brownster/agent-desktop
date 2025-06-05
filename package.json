@@ -29,7 +29,8 @@
     "dev": "nx serve ccp-client",
     "dev:admin": "nx serve ccp-admin",
     "clean": "nx reset && rm -rf node_modules",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "module:publish": "ts-node tools/module-publish.ts"
   },
   "devDependencies": {
     "@babel/core": "^7.14.5",
@@ -85,6 +86,7 @@
     "lucide-react": "^0.316.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "semver": "^7.7.2",
     "tailwindcss": "^3.4.1",
     "zod": "^3.22.4",
     "zustand": "^4.4.7"

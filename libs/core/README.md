@@ -323,3 +323,13 @@ Starter templates for new modules are available under `libs/core/templates`.
 The `ExampleModule` demonstrates minimal metadata and configuration. Copy this
 file when creating new modules to ensure consistent structure and dependency
 declarations.
+
+## Module Publishing
+
+Modules can be packaged and published to the local registry using the provided CLI.
+
+```
+pnpm module:publish ./path/to/my-module
+```
+
+This command copies the module into the `modules/` directory and records its metadata in `module-registry.json`. The loader will resolve modules from this registry when no explicit path is provided.

@@ -12,6 +12,7 @@ import type {
 } from '@agent-desktop/types';
 
 import type { ConfigService } from '@agent-desktop/config';
+import semver from 'semver';
 
 import {
   type IModule,
@@ -35,6 +36,7 @@ export interface ModuleRegistryOptions {
   readonly maxConcurrentLoads?: number;
   readonly dependencyTimeoutMs?: number;
   readonly healthCheckIntervalMs?: number;
+  readonly appVersion?: string;
 }
 
 /**
@@ -189,6 +191,24 @@ export class ModuleRegistry implements IModuleRegistry {
       const dependencyValidation = await this.validateDependencies(module);
       if (!dependencyValidation.success) {
         return dependencyValidation;
+      }
+
+      // Check application version compatibility
+      if (module.metadata.minAppVersion) {
+        if (!this.options.appVersion || !semver.gte(this.options.appVersion, module.metadata.minAppVersion)) {
+          return {
+            success: false,
+            error: new Error(`Module ${moduleId} requires app version >= ${module.metadata.minAppVersion}`),
+          };
+        }
+      }
+      if (module.metadata.maxAppVersion) {
+        if (!this.options.appVersion || !semver.lte(this.options.appVersion, module.metadata.maxAppVersion)) {
+          return {
+            success: false,
+            error: new Error(`Module ${moduleId} requires app version <= ${module.metadata.maxAppVersion}`),
+          };
+        }
       }
 
       // Register the module
@@ -618,6 +638,16 @@ export class ModuleRegistry implements IModuleRegistry {
           }
         } else if (!dependency.optional) {
           return { success: false, error: new Error(`Required dependency ${dependency.moduleId} is not registered`) };
+        }
+      }
+
+      const found = this.modules.get(dependency.moduleId);
+      if (dependency.version && found) {
+        if (!semver.satisfies(found.metadata.version, dependency.version)) {
+          return {
+            success: false,
+            error: new Error(`Dependency ${dependency.moduleId} version ${found.metadata.version} does not satisfy ${dependency.version}`),
+          };
         }
       }
     }

@@ -149,9 +149,25 @@ describe('ModuleRegistry', () => {
     it('should validate dependencies during registration', async () => {
       // Try to register dependent module without its dependency
       const result = await registry.register(dependentModule);
-      
+
       expect(result.success).toBe(false);
       expect(result.error?.message).toContain('Required dependency test-module is not registered');
+    });
+
+    it('should enforce dependency version ranges', async () => {
+      const goodV1 = require('./__tests__/modules/good-module.js');
+      const goodV2 = require('./__tests__/modules/good-module-v2.js');
+      const dependent = require('./__tests__/modules/dependent-version-module.js');
+
+      await registry.register(new goodV1());
+      const result = await registry.register(new dependent());
+      expect(result.success).toBe(false);
+      expect(result.error?.message).toContain('does not satisfy');
+
+      await registry.unregister('good-module' as ModuleID);
+      await registry.register(new goodV2());
+      const ok = await registry.register(new dependent());
+      expect(ok.success).toBe(true);
     });
 
     it('should register modules with dependencies in correct order', async () => {

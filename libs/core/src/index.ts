@@ -36,6 +36,8 @@ export {
   type ModuleHealthCheck,
 } from './module-health';
 
+export { ModuleRegistryService, type ModulePackageMetadata } from './registry/module-registry.service';
+
 // Re-export types from the types library
 export type {
   ModuleConfig,

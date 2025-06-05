@@ -103,6 +103,7 @@ export class ModuleLoader implements IModuleLoader {
       readonly maxCacheSize?: number;
       readonly enableHotReload?: boolean;
       readonly modulePaths?: Record<ModuleID, string>;
+      readonly registryService?: import('./registry/module-registry.service').ModuleRegistryService;
     } = {}
   ) {
     this.logger = logger.createChild('module-loader');
@@ -180,7 +181,7 @@ export class ModuleLoader implements IModuleLoader {
       });
 
       // Determine module path
-      const resolvedPath = modulePath || this.resolveModulePath(moduleId);
+      const resolvedPath = modulePath || this.resolveModulePath(moduleId, options.version);
       if (!resolvedPath) {
         return {
           success: false,
@@ -422,15 +423,22 @@ export class ModuleLoader implements IModuleLoader {
    * @param moduleId - Module ID
    * @returns Module path or undefined
    */
-  private resolveModulePath(moduleId: ModuleID): string | undefined {
+  private resolveModulePath(moduleId: ModuleID, version?: string): string | undefined {
     // Check explicit path mapping
     if (this.options.modulePaths?.[moduleId]) {
       return this.options.modulePaths[moduleId];
     }
 
+    if (this.options.registryService) {
+      const resolved = this.options.registryService.getModulePath(moduleId, version);
+      if (resolved) return resolved;
+    }
+
     // Default path resolution
-    // In a real implementation, this would resolve from a module registry or file system
     const basePath = './modules';
+    if (version) {
+      return `${basePath}/${moduleId}/${version}/index.js`;
+    }
     return `${basePath}/${moduleId}/index.js`;
   }
 

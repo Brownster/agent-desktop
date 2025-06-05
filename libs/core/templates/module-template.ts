@@ -26,6 +26,7 @@ export class ExampleModule extends BaseModule {
       position: DEFAULT_TEMPLATE_CONFIG.position,
       priority: DEFAULT_TEMPLATE_CONFIG.priority,
       tags: ['template'],
+      minAppVersion: '1.0.0',
     });
   }
 
