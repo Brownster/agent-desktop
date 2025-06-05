@@ -50,7 +50,14 @@ export class ModuleRegistryService {
 
   async publishModule(moduleDir: string): Promise<ModulePackageMetadata> {
     const modulePath = path.resolve(moduleDir, 'index.js');
-    const mod = require(modulePath);
+    let mod: any;
+    // Use dynamic import when running under ESM
+    if (typeof require === 'function') {
+      mod = require(modulePath);
+    } else {
+      const { pathToFileURL } = await import('url');
+      mod = await import(pathToFileURL(modulePath).href);
+    }
     const ModuleClass = mod.default || mod.Module || mod;
     const instance = new ModuleClass();
     const metadata = instance.metadata as {
