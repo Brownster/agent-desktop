@@ -1,0 +1,16 @@
+{
+  "name": "amazon-connect-chat-js",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "description": "Stubbed Amazon Connect ChatJS for testing",
+  "scripts": {
+    "build": "tsc -p tsconfig.lib.json",
+    "test": "jest",
+    "lint": "eslint src --ext ts --report-unused-disable-directives --max-warnings 0",
+    "type-check": "tsc --noEmit"
+  },
+  "license": "MIT"
+}

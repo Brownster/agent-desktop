@@ -207,6 +207,25 @@ await connectService.changeAgentState('Available');
 await connectService.acceptContact(contactId);
 ```
 
+### ChatService
+
+**File**: `src/services/chat.service.ts`
+
+Lightweight wrapper around Amazon Connect ChatJS used for managing chat sessions.
+
+#### Responsibilities
+- Manage `connect.ChatSession` lifecycle
+- Send messages and attachments
+- Listen for message and typing events
+- Persist chat history to the contact store
+
+#### Usage Example
+```typescript
+import ChatService from '@/services/chat.service';
+const chat = new ChatService(logger);
+chat.startSession({ contactId, participantToken, participantId: 'agent' });
+```
+
 ---
 
 ## 📞 Call Controls

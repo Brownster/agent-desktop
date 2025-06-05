@@ -9,6 +9,7 @@ import { useQueueStore } from '@/store/queue.store';
 import type { Logger } from '@agent-desktop/logging';
 import * as connectRTC from 'amazon-connect-rtc-js';
 import type { AudioConfiguration } from '@agent-desktop/types';
+import ChatService from './chat.service';
 
 /**
  * View contact event interface
@@ -228,6 +229,12 @@ interface ConnectContact {
   getQueue(): ConnectQueue;
   getQueueTimestamp(): Date;
   getConnections(): ConnectConnection[];
+  getConnectionData?(): {
+    chatDetails?: {
+      participantToken: string;
+      participantId: string;
+    };
+  };
   getInitialConnection(): ConnectConnection;
   getActiveInitialConnection(): ConnectConnection;
   getThirdPartyConnections(): ConnectConnection[];
@@ -292,6 +299,7 @@ export class ConnectService {
   private activeContacts = new Map<string, ConnectContact>();
   private audioConfig: AudioConfiguration | undefined;
   private rtcSession: connectRTC.SoftphoneRTCSession | null = null;
+  private chatService: ChatService | null = null;
 
   constructor(logger: Logger) {
     this.logger = logger.createChild('ConnectService');
@@ -590,6 +598,27 @@ export class ConnectService {
       startTime: new Date(),
     });
     useContactStore.getState().setActiveContact(contactId);
+
+    if (contact.getType() === 'chat') {
+      try {
+        const data = contact.getConnectionData?.();
+        const token = data?.chatDetails?.participantToken;
+        const participantId = data?.chatDetails?.participantId ?? 'agent';
+        if (token) {
+          if (!this.chatService) {
+            this.chatService = new ChatService(this.logger);
+          }
+          void this.chatService.startSession({
+            contactId,
+            participantToken: token,
+            participantId,
+            region: (window as any).connect?.region || 'us-east-1',
+          });
+        }
+      } catch (err) {
+        this.logger.error('Failed to start chat session', { contactId, err });
+      }
+    }
   }
 
   /**
@@ -621,6 +650,10 @@ export class ConnectService {
     const contactId = contact.getContactId();
     useContactStore.getState().removeContact(contactId);
     this.activeContacts.delete(contactId);
+    if (contact.getType() === 'chat') {
+      this.chatService?.endSession();
+      this.chatService = null;
+    }
   }
 
   /**
