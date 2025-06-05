@@ -11,5 +11,6 @@
     "test": "jest",
     "lint": "eslint src --ext ts --report-unused-disable-directives --max-warnings 0",
     "type-check": "tsc --noEmit"
-  }
+  },
+  "license": "MIT"
 }
