@@ -6,7 +6,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import Modules, { type Module, type DependencyCheck } from '../Modules';
+import Modules from '../Modules';
 
 // Mock @headlessui/react
 jest.mock('@headlessui/react', () => ({

@@ -1,32 +1,32 @@
 export class DynamoDBDocumentClient {
   static from = jest.fn().mockReturnValue(new DynamoDBDocumentClient());
-  
-  constructor(client?: any, translateConfig?: any) {}
+
+  constructor(_client?: any, _translateConfig?: any) {}
   
   send = jest.fn().mockResolvedValue({});
   destroy = jest.fn();
 }
 
 export class GetCommand {
-  constructor(input: any) {}
+  constructor(_input: any) {}
 }
 
 export class PutCommand {
-  constructor(input: any) {}
+  constructor(_input: any) {}
 }
 
 export class UpdateCommand {
-  constructor(input: any) {}
+  constructor(_input: any) {}
 }
 
 export class DeleteCommand {
-  constructor(input: any) {}
+  constructor(_input: any) {}
 }
 
 export class QueryCommand {
-  constructor(input: any) {}
+  constructor(_input: any) {}
 }
 
 export class ScanCommand {
-  constructor(input: any) {}
+  constructor(_input: any) {}
 }

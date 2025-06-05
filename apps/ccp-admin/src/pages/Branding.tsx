@@ -4,7 +4,6 @@ import {
   PhotoIcon,
   CodeBracketIcon,
   EyeIcon,
-  DocumentDuplicateIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
   ArrowDownTrayIcon,

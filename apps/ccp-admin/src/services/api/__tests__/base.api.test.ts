@@ -5,7 +5,7 @@
 
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { BaseAPIService } from '../base.api';
-import { ErrorHandler, APIError, NetworkError } from '../../errors';
+import { APIError } from '../../errors';
 
 // Mock axios
 jest.mock('axios');
@@ -292,7 +292,7 @@ describe('BaseAPIService', () => {
           },
         } as AxiosResponse;
 
-        mockAxiosInstance.post.mockImplementation((url, data, config) => {
+        mockAxiosInstance.post.mockImplementation((_url, _data, config) => {
           // Simulate upload progress
           if (config?.onUploadProgress) {
             config.onUploadProgress({ loaded: 50, total: 100 } as any);

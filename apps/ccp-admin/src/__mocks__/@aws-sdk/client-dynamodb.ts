@@ -1,5 +1,5 @@
 export class DynamoDBClient {
-  constructor(config?: any) {}
+  constructor(_config?: any) {}
   
   send = jest.fn().mockResolvedValue({});
   destroy = jest.fn();
