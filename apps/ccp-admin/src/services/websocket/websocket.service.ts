@@ -81,7 +81,7 @@ export class AdminWebSocketService {
 
   constructor(options: Partial<WebSocketOptions> = {}, logger?: Logger) {
     this.logger = logger?.createChild('AdminWebSocketService') || new Logger({
-      service: 'AdminWebSocketService',
+      context: 'AdminWebSocketService',
       level: 'info',
     });
 
