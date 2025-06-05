@@ -2,6 +2,11 @@
  * @fileoverview Test setup for configuration library
  */
 
+// Provide a WebSocket implementation for Node-based tests
+// so that modules using WebSocket can run without errors.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+(globalThis as any).WebSocket = require('ws');
+
 // Global test utilities for configuration
 global.ConfigTestUtils = {
   /**
