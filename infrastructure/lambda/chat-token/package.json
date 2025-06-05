@@ -1,0 +1,19 @@
+{
+  "name": "ccp-chat-token-lambda",
+  "version": "1.0.0",
+  "description": "Returns chat participant token",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "package": "npm run build && zip -r chat-token.zip dist/ node_modules/"
+  },
+  "dependencies": {
+    "@aws-sdk/client-connect": "^3.400.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.119",
+    "typescript": "^5.2.2"
+  },
+  "license": "MIT",
+  "engines": { "node": ">=18.0.0" }
+}

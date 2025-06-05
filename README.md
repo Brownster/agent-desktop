@@ -178,6 +178,13 @@ The main contact center application with full Amazon Connect integration.
 - **Error Handling**: Robust error recovery and logging
 - **VDI Optimization**: Optimized for virtual desktop environments
 
+#### 💬 ChatService (`chat.service.ts`)
+
+- **ChatSession Lifecycle**: Handles start, resume and end of chats
+- **Message Handling**: Sends messages and attachments
+- **Typing Indicators**: Updates store with customer typing events
+- **Store Integration**: Persists chat history in real time
+
 ### 🏪 State Management
 
 - **Contact Store**: Active contact management

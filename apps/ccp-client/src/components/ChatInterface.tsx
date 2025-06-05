@@ -16,33 +16,15 @@ import {
 } from '@heroicons/react/24/outline';
 import { Menu, Transition } from '@headlessui/react';
 import clsx from 'clsx';
-import { useActiveContact } from '@/store/contact.store';
+import { useActiveContact, type ChatMessage } from '@/store/contact.store';
 
 /**
  * Chat message interface
  */
-interface ChatMessage {
-  id: string;
-  contactId: string;
-  content: string;
-  timestamp: Date;
-  sender: 'customer' | 'agent' | 'system';
-  messageType: 'text' | 'attachment' | 'system';
-  status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
-  attachments?: ChatAttachment[];
-}
 
 /**
  * Chat attachment interface
  */
-interface ChatAttachment {
-  id: string;
-  name: string;
-  size: number;
-  type: string;
-  url?: string;
-}
-
 /**
  * Chat interface props
  */
@@ -169,17 +151,17 @@ function ChatInterface({
   const [message, setMessage] = useState('');
   const [attachments, setAttachments] = useState<File[]>([]);
   const [isTyping, setIsTyping] = useState(false);
-  const [customerTyping] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+
+  const activeContact = useActiveContact();
+  const messages = activeContact?.chatSession?.messages ?? [];
+  const customerTyping = activeContact?.chatSession?.isTyping ?? false;
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
   
-  const activeContact = useActiveContact();
-
   /**
    * Scroll to bottom of messages
    */
@@ -187,41 +169,6 @@ function ChatInterface({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
-  /**
-   * Initialize sample messages for demo
-   */
-  useEffect(() => {
-    if (activeContact?.type === 'chat') {
-      setMessages([
-        {
-          id: '1',
-          contactId: activeContact.contactId,
-          content: 'Hello, I need help with my account',
-          timestamp: new Date(Date.now() - 300000),
-          sender: 'customer',
-          messageType: 'text',
-          status: 'read',
-        },
-        {
-          id: '2',
-          contactId: activeContact.contactId,
-          content: 'Customer connected to chat',
-          timestamp: new Date(Date.now() - 299000),
-          sender: 'system',
-          messageType: 'system',
-        },
-        {
-          id: '3',
-          contactId: activeContact.contactId,
-          content: 'Hi! I\'d be happy to help you with your account. Can you please provide me with your account number?',
-          timestamp: new Date(Date.now() - 240000),
-          sender: 'agent',
-          messageType: 'text',
-          status: 'read',
-        },
-      ]);
-    }
-  }, [activeContact]);
 
   /**
    * Scroll to bottom when messages change
@@ -281,37 +228,10 @@ function ChatInterface({
     setIsTyping(false);
 
     try {
-      // Create new message
-      const newMessage: ChatMessage = {
-        id: Date.now().toString(),
-        contactId: activeContact?.contactId || '',
-        content: message.trim(),
-        timestamp: new Date(),
-        sender: 'agent',
-        messageType: attachments.length > 0 ? 'attachment' : 'text',
-        status: 'sending',
-        attachments: attachments.map((file, index) => ({
-          id: `${Date.now()}-${index}`,
-          name: file.name,
-          size: file.size,
-          type: file.type,
-        })),
-      };
-
-      // Add message to state
-      setMessages(prev => [...prev, newMessage]);
-
       // Call parent handler
       if (onSendMessage) {
         await onSendMessage(message.trim(), attachments.length > 0 ? attachments : undefined);
       }
-
-      // Update message status
-      setMessages(prev => prev.map(msg => 
-        msg.id === newMessage.id 
-          ? { ...msg, status: 'sent' }
-          : msg
-      ));
 
       // Clear inputs
       setMessage('');
@@ -323,16 +243,11 @@ function ChatInterface({
       }
       
     } catch (error) {
-      // Update message status to failed
-      setMessages(prev => prev.map(msg => 
-        msg.id === messages[messages.length - 1]?.id 
-          ? { ...msg, status: 'failed' }
-          : msg
-      ));
+      // Ignore
     } finally {
       setIsSending(false);
     }
-  }, [message, attachments, isSending, activeContact, onSendMessage, messages]);
+  }, [message, attachments, isSending, onSendMessage]);
 
   /**
    * Handle file attachment
