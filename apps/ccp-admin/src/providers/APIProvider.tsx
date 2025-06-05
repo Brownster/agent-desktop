@@ -3,16 +3,30 @@
  * @module providers/APIProvider
  */
 
-import React, { useEffect, useState } from 'react';
-import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import React, { useEffect, useState, useRef } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Toaster } from 'react-hot-toast';
 import { queryConfig, environmentConfig } from '../services/config/api.config';
-import { useWebSocketConnection } from '../services/websocket';
+import { useWebSocketConnection, useWebSocketService } from '../services/websocket';
+import { CustomerAPIService, ModuleAPIService, AnalyticsAPIService } from '../services/api';
+import type { AdminWebSocketService } from '../services/websocket';
 import { ErrorHandler } from '../services/errors';
 import { createLogger } from '@agent-desktop/logging';
 
 const errorLogger = createLogger('ccp-admin:api-error-boundary');
+
+export interface IAPIContext {
+  customerAPI: CustomerAPIService;
+  modulesAPI: ModuleAPIService;
+  analyticsAPI: AnalyticsAPIService;
+  websocket: AdminWebSocketService;
+  isConnected: boolean;
+  connect: (url?: string) => Promise<void>;
+  disconnect: () => void;
+}
+
+export const APIContext = React.createContext<IAPIContext | undefined>(undefined);
 
 /**
  * Create React Query client with custom configuration
@@ -233,56 +247,73 @@ function ConnectionStatusIndicator() {
  */
 export function APIProvider({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => createQueryClient());
+  const customerAPI = useRef(new CustomerAPIService()).current;
+  const modulesAPI = useRef(new ModuleAPIService()).current;
+  const analyticsAPI = useRef(new AnalyticsAPIService()).current;
+  const websocket = useRef(useWebSocketService()).current;
+  const { connectionState, connect, disconnect } = useWebSocketConnection();
+
+  const contextValue: IAPIContext = {
+    customerAPI,
+    modulesAPI,
+    analyticsAPI,
+    websocket,
+    isConnected: connectionState === 'connected',
+    connect,
+    disconnect,
+  };
 
   return (
     <APIErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <WebSocketManager>
-          {children}
-          <ConnectionStatusIndicator />
+        <APIContext.Provider value={contextValue}>
+          <WebSocketManager>
+            {children}
+            <ConnectionStatusIndicator />
 
-          {/* Toast notifications */}
-          <Toaster
-            position='top-right'
-            toastOptions={{
-              duration: 4000,
-              className: 'text-sm',
-              success: {
-                iconTheme: {
-                  primary: '#10B981',
-                  secondary: '#ffffff',
+            {/* Toast notifications */}
+            <Toaster
+              position='top-right'
+              toastOptions={{
+                duration: 4000,
+                className: 'text-sm',
+                success: {
+                  iconTheme: {
+                    primary: '#10B981',
+                    secondary: '#ffffff',
+                  },
                 },
-              },
-              error: {
-                iconTheme: {
-                  primary: '#EF4444',
-                  secondary: '#ffffff',
+                error: {
+                  iconTheme: {
+                    primary: '#EF4444',
+                    secondary: '#ffffff',
+                  },
+                  duration: 6000,
                 },
-                duration: 6000,
-              },
-              loading: {
-                iconTheme: {
-                  primary: '#6B7280',
-                  secondary: '#ffffff',
-                },
-              },
-            }}
-          />
-
-          {/* React Query DevTools (development only) */}
-          {environmentConfig.enableDevtools && (
-            <ReactQueryDevtools
-              initialIsOpen={false}
-              position='bottom-right'
-              toggleButtonProps={{
-                style: {
-                  bottom: '20px',
-                  right: '20px',
+                loading: {
+                  iconTheme: {
+                    primary: '#6B7280',
+                    secondary: '#ffffff',
+                  },
                 },
               }}
             />
-          )}
-        </WebSocketManager>
+
+            {/* React Query DevTools (development only) */}
+            {environmentConfig.enableDevtools && (
+              <ReactQueryDevtools
+                initialIsOpen={false}
+                position='bottom-right'
+                toggleButtonProps={{
+                  style: {
+                    bottom: '20px',
+                    right: '20px',
+                  },
+                }}
+              />
+            )}
+          </WebSocketManager>
+        </APIContext.Provider>
       </QueryClientProvider>
     </APIErrorBoundary>
   );
@@ -291,13 +322,10 @@ export function APIProvider({ children }: { children: React.ReactNode }) {
 /**
  * Hook for accessing the query client
  */
-export function useAPIProvider() {
-  const queryClient = useQueryClient();
-  const webSocket = useWebSocketConnection();
-
-  return {
-    queryClient,
-    webSocket,
-    isOnline: webSocket.isConnected,
-  };
+export function useAPIProvider(): IAPIContext {
+  const context = React.useContext(APIContext);
+  if (!context) {
+    throw new Error('APIContext must be used within an APIProvider');
+  }
+  return context;
 }
