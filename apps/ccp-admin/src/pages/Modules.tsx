@@ -2,14 +2,8 @@ import React, { useState } from 'react';
 import {
   MagnifyingGlassIcon,
   PlusIcon,
-  EyeIcon,
-  DocumentTextIcon,
-  CodeBracketIcon,
   Cog6ToothIcon,
   CubeIcon,
-  ExclamationTriangleIcon,
-  XCircleIcon,
-  ChevronRightIcon,
 } from '@heroicons/react/24/outline';
 import { Dialog, Switch } from '@headlessui/react';
 

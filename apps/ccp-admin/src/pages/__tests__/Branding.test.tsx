@@ -7,7 +7,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import userEvent from '@testing-library/user-event';
-import Branding, { type BrandingConfig } from '../Branding';
+import Branding from '../Branding';
 import { CustomerAPIService } from '@/services/api/customers.api';
 import { assetsAPI } from '@/services/api/assets.api';
 
