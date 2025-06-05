@@ -1,0 +1,44 @@
+{
+  "name": "aws-cdk",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "infrastructure/aws-cdk",
+  "projectType": "application",
+  "tags": ["scope:infrastructure"],
+  "targets": {
+    "build": {
+      "executor": "@nx/workspace:run-commands",
+      "options": {
+        "command": "pnpm run build",
+        "cwd": "infrastructure/aws-cdk"
+      }
+    },
+    "deploy:dev": {
+      "executor": "@nx/workspace:run-commands",
+      "options": {
+        "command": "pnpm run deploy:dev",
+        "cwd": "infrastructure/aws-cdk"
+      }
+    },
+    "deploy:staging": {
+      "executor": "@nx/workspace:run-commands",
+      "options": {
+        "command": "pnpm run deploy:staging",
+        "cwd": "infrastructure/aws-cdk"
+      }
+    },
+    "deploy:prod": {
+      "executor": "@nx/workspace:run-commands",
+      "options": {
+        "command": "pnpm run deploy:prod",
+        "cwd": "infrastructure/aws-cdk"
+      }
+    },
+    "destroy": {
+      "executor": "@nx/workspace:run-commands",
+      "options": {
+        "command": "pnpm run destroy",
+        "cwd": "infrastructure/aws-cdk"
+      }
+    }
+  }
+}

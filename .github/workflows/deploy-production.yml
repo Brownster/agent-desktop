@@ -151,41 +151,25 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Install CDK dependencies
-        working-directory: infrastructure/aws-cdk
-        run: pnpm install
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: Build Lambda function
-        working-directory: infrastructure/lambda/config-api
-        run: |
-          pnpm install
-          pnpm run build
+      - name: Build Lambda artifacts
+        run: ./infrastructure/scripts/package-lambdas.sh
 
-      - name: CDK Bootstrap (if needed)
-        working-directory: infrastructure/aws-cdk
-        run: |
-          pnpm cdk bootstrap aws://${{ secrets.AWS_ACCOUNT_ID }}/${{ env.AWS_REGION }} || true
-
-      - name: CDK Deploy Production
+      - name: Deploy infrastructure via Nx
         id: deploy
-        working-directory: infrastructure/aws-cdk
-        run: |
-          # Deploy with production context
-          pnpm cdk deploy ccp-config-api-production \
-            --context environment=production \
-            --context terminationProtection=true \
-            --require-approval=never \
-            --outputs-file outputs.json
-          
-          # Extract outputs
-          CONFIG_API_URL=$(cat outputs.json | jq -r '.["ccp-config-api-production"].ConfigApiUrl')
-          CONFIG_TABLE_NAME=$(cat outputs.json | jq -r '.["ccp-config-api-production"].ConfigTableName')
-          
-          echo "config-api-url=$CONFIG_API_URL" >> $GITHUB_OUTPUT
-          echo "config-table-name=$CONFIG_TABLE_NAME" >> $GITHUB_OUTPUT
+        run: pnpm nx deploy:prod aws-cdk --outputs-file infrastructure/aws-cdk/outputs.json
         env:
           CDK_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
           CDK_DEFAULT_REGION: ${{ env.AWS_REGION }}
+
+      - name: Extract outputs
+        run: |
+          CONFIG_API_URL=$(cat infrastructure/aws-cdk/outputs.json | jq -r '.["ccp-config-api-production"].ConfigApiUrl')
+          CONFIG_TABLE_NAME=$(cat infrastructure/aws-cdk/outputs.json | jq -r '.["ccp-config-api-production"].ConfigTableName')
+          echo "config-api-url=$CONFIG_API_URL" >> $GITHUB_OUTPUT
+          echo "config-table-name=$CONFIG_TABLE_NAME" >> $GITHUB_OUTPUT
 
   # Deploy Admin Dashboard to production
   deploy-admin-prod:
