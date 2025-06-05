@@ -5,6 +5,13 @@
 
 import type { Logger } from '@agent-desktop/logging';
 import type { ConfigChangeEvent } from './config.service';
+import WebSocketNode from 'ws';
+
+// Use the browser WebSocket implementation when available, otherwise fall back
+// to the Node.js "ws" package. This allows the service to run in both
+// environments without relying on DOM types in Node.
+const WS: typeof WebSocketNode =
+  (globalThis as any).WebSocket ?? (WebSocketNode as unknown as typeof WebSocketNode);
 
 /**
  * WebSocket message types
@@ -74,7 +81,7 @@ const DEFAULT_WEBSOCKET_OPTIONS: WebSocketOptions = {
  * WebSocket configuration service for real-time updates
  */
 export class ConfigWebSocketService {
-  private ws: WebSocket | undefined;
+  private ws: InstanceType<typeof WS> | undefined;
   private readonly options: WebSocketOptions;
   private readonly logger: Logger;
   private reconnectAttempts = 0;
@@ -127,7 +134,7 @@ export class ConfigWebSocketService {
 
     return new Promise((resolve, reject) => {
       try {
-        this.ws = new WebSocket(this.options.url);
+        this.ws = new WS(this.options.url);
 
         const connectionTimeout = setTimeout(() => {
           this.logger.error('WebSocket connection timeout');
@@ -297,7 +304,7 @@ export class ConfigWebSocketService {
    * Get connection status
    */
   isConnectionOpen(): boolean {
-    return this.isConnected && this.ws?.readyState === WebSocket.OPEN;
+    return this.isConnected && this.ws?.readyState === WS.OPEN;
   }
 
   /**
