@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   SwatchIcon,
   PhotoIcon,
@@ -9,7 +9,10 @@ import {
   ExclamationTriangleIcon,
   ArrowDownTrayIcon,
   ArrowUpTrayIcon,
+  Cog6ToothIcon,
 } from '@heroicons/react/24/outline';
+import { CustomerAPIService } from '@/services/api/customers.api';
+import { assetsAPI } from '@/services/api/assets.api';
 
 /**
  * Branding configuration interface
@@ -118,6 +121,34 @@ const defaultBranding: BrandingConfig = {
 };
 
 /**
+ * Validate branding configuration
+ */
+export function validateBrandingConfig(cfg: BrandingConfig): string[] {
+  const errors: string[] = [];
+  const colorRe = /^#[0-9A-Fa-f]{6}$/;
+  const colorFields = [
+    cfg.theme.primaryColor,
+    cfg.theme.secondaryColor,
+    cfg.theme.accentColor,
+    cfg.theme.backgroundColor,
+    cfg.theme.textColor,
+  ];
+  if (colorFields.some(c => !colorRe.test(c))) {
+    errors.push('Invalid color value');
+  }
+  if (!cfg.applicationName.trim()) {
+    errors.push('Application name is required');
+  }
+  if (cfg.logo.width && cfg.logo.width > 500) {
+    errors.push('Logo width too large');
+  }
+  if (cfg.logo.height && cfg.logo.height > 200) {
+    errors.push('Logo height too large');
+  }
+  return errors;
+}
+
+/**
  * Color picker component
  */
 function ColorPicker({
@@ -166,23 +197,23 @@ function ColorPicker({
 function LogoUpload({
   logo,
   onLogoChange,
+  onFileUpload,
 }: {
   logo: BrandingConfig['logo'];
   onLogoChange: (logo: Partial<BrandingConfig['logo']>) => void;
+  onFileUpload: (file: File) => Promise<string>;
 }): React.ReactElement {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
 
-  const handleFileSelect = (file: File) => {
+  const handleFileSelect = async (file: File) => {
     if (file && file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        onLogoChange({
-          url: e.target?.result as string,
-          alt: file.name.split('.')[0],
-        });
-      };
-      reader.readAsDataURL(file);
+      try {
+        const url = await onFileUpload(file);
+        onLogoChange({ url, alt: file.name.split('.')[0] });
+      } catch (err) {
+        console.error('Upload failed', err);
+      }
     }
   };
 
@@ -509,6 +540,32 @@ function Branding(): React.ReactElement {
   const [activeTab, setActiveTab] = useState<'theme' | 'logo' | 'css' | 'advanced'>('theme');
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const customerAPI = new CustomerAPIService();
+
+  // Load existing branding on mount
+  useEffect(() => {
+    customerAPI
+      .getCustomerConfig(config.customerId)
+      .then((customer) => {
+        if (customer?.branding) {
+          setConfig((prev) => ({
+            ...prev,
+            theme: {
+              ...prev.theme,
+              primaryColor: customer.branding.primary_color,
+              secondaryColor: customer.branding.secondary_color,
+              accentColor: customer.branding.accent_color || prev.theme.accentColor,
+            },
+            logo: { ...prev.logo, url: customer.branding.logo_url || '' },
+            customCSS: customer.branding.custom_css || '',
+            favicon: customer.branding.favicon_url || '',
+            applicationName: customer.branding.application_title,
+          }));
+        }
+      })
+      .catch((err) => console.error('Failed to load branding:', err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Handle configuration updates
   const updateConfig = (updates: Partial<BrandingConfig>) => {
@@ -538,11 +595,26 @@ function Branding(): React.ReactElement {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const errors = validateBrandingConfig(config);
+      if (errors.length) {
+        console.error('Validation failed', errors);
+        return;
+      }
+
+      await customerAPI.updateCustomerConfig(config.customerId, {
+        branding: {
+          logo_url: config.logo.url,
+          favicon_url: config.favicon,
+          primary_color: config.theme.primaryColor,
+          secondary_color: config.theme.secondaryColor,
+          accent_color: config.theme.accentColor,
+          theme: config.theme.mode,
+          custom_css: config.customCSS,
+          application_title: config.applicationName,
+          company_name: config.applicationName,
+        },
+      });
       setLastSaved(new Date());
-      // In real implementation, would call API to save configuration
-      console.log('Saving branding configuration:', config);
     } catch (error) {
       console.error('Failed to save configuration:', error);
     } finally {
@@ -762,6 +834,10 @@ function Branding(): React.ReactElement {
                   <LogoUpload
                     logo={config.logo}
                     onLogoChange={updateLogo}
+                    onFileUpload={async (file) => {
+                      const result = await assetsAPI.uploadAsset(file);
+                      return result.url;
+                    }}
                   />
                 </div>
               </div>

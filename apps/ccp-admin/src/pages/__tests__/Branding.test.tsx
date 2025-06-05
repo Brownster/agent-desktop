@@ -8,6 +8,11 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import userEvent from '@testing-library/user-event';
 import Branding, { type BrandingConfig } from '../Branding';
+import { CustomerAPIService } from '@/services/api/customers.api';
+import { assetsAPI } from '@/services/api/assets.api';
+
+jest.mock('@/services/api/customers.api');
+jest.mock('@/services/api/assets.api');
 
 // Mock file reader
 const mockFileReader = {
@@ -23,8 +28,15 @@ global.URL.createObjectURL = jest.fn(() => 'mock-url');
 global.URL.revokeObjectURL = jest.fn();
 
 describe('Branding Page', () => {
+  let customerMock: jest.Mocked<CustomerAPIService>;
   beforeEach(() => {
     jest.clearAllMocks();
+    customerMock = {
+      getCustomerConfig: jest.fn().mockResolvedValue({ branding: { primary_color: '#111111', secondary_color: '#222222', accent_color: '#333333', application_title: 'Contact Center' } }),
+      updateCustomerConfig: jest.fn().mockResolvedValue({}),
+    } as any;
+    (CustomerAPIService as jest.MockedClass<typeof CustomerAPIService>).mockImplementation(() => customerMock);
+    (assetsAPI.uploadAsset as jest.Mock).mockResolvedValue({ url: 's3://logo.png' });
   });
 
   it('renders without crashing', () => {
@@ -303,15 +315,13 @@ describe('Branding Page', () => {
     it('can save changes', async () => {
       const user = userEvent.setup();
       render(<Branding />);
-      
+
       const saveButton = screen.getByText('Save Changes');
       await user.click(saveButton);
-      
-      expect(screen.getByText('Saving...')).toBeInTheDocument();
-      
+
       await waitFor(() => {
-        expect(screen.getByText(/Saved \d+:\d+:\d+/)).toBeInTheDocument();
-      }, { timeout: 2000 });
+        expect(customerMock.updateCustomerConfig).toHaveBeenCalled();
+      });
     });
 
     it('can export configuration', async () => {
@@ -380,4 +390,7 @@ describe('Branding Page', () => {
       await waitFor(() => {
         const primaryColorInput = screen.getByDisplayValue('#FF0000');
         expect(primaryColorInput).toBeInTheDocument();
-      });\n    });\n  });\n});
+      });
+    });
+  });
+});
