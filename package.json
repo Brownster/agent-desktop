@@ -11,7 +11,8 @@
   "workspaces": [
     "apps/*",
     "libs/*",
-    "tools/*"
+    "tools/*",
+    "infrastructure/*"
   ],
   "scripts": {
     "build": "nx run-many --target=build --all --parallel=3",

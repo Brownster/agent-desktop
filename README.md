@@ -110,6 +110,8 @@ pnpm nx e2e ccp-client-e2e        # End-to-end tests
 # Infrastructure
 pnpm nx deploy:staging ccp-client # Deploy to staging
 pnpm nx deploy:prod ccp-client    # Deploy to production
+pnpm nx deploy:staging aws-cdk    # Deploy infrastructure to staging
+pnpm nx deploy:prod aws-cdk       # Deploy infrastructure to production
 ```
 
 ## 📱 CCP Client Application
@@ -423,7 +425,7 @@ See [ROADMAP.md](./ROADMAP.md) for detailed feature planning and timeline.
 1. TypeScript build errors in existing store files (in progress)
 2. Library dependencies need proper package.json setup
 3. ESLint configuration needs workspace updates
-4. AWS infrastructure deployment scripts needed
+4. AWS infrastructure can be deployed using the provided Nx targets
 
 ### Workarounds
 

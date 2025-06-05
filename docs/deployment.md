@@ -24,13 +24,15 @@ This performs a production build and syncs the files to the `ccp-client-producti
 
 ## Infrastructure
 
-Infrastructure resources for the configuration API are managed using AWS CDK inside the `infrastructure/aws-cdk` package. Deployment scripts are provided there for each environment:
+Infrastructure resources for the configuration API are managed using AWS CDK inside the `infrastructure/aws-cdk` package. Deployment can be run using Nx targets:
 
 ```bash
-pnpm run deploy:dev     # development
-pnpm run deploy:staging # staging
-pnpm run deploy:prod    # production
+pnpm nx deploy:dev aws-cdk     # development
+pnpm nx deploy:staging aws-cdk # staging
+pnpm nx deploy:prod aws-cdk    # production
 ```
+
+For local convenience, you can also run `scripts/deploy-infra.sh <environment>` which wraps the Nx commands.
 
 ### Asset Storage
 
