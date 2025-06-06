@@ -20,7 +20,7 @@
     "@agent-desktop/config": "workspace:*",
     "@agent-desktop/logging": "workspace:*",
     "@agent-desktop/types": "workspace:*",
-    "@headlessui/react": "^1.7.19",
+    "@headlessui/react": "^2.2.4",
     "@heroicons/react": "^2.0.18",
     "@hookform/resolvers": "^3.3.1",
     "@tanstack/react-query": "^4.35.0",
