@@ -3,16 +3,62 @@
  * @module providers/APIProvider
  */
 
-import React, { useEffect, useState } from 'react';
-import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import React, { useEffect, useState, useMemo } from 'react';
+import {
+  QueryClient,
+  QueryClientProvider,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Toaster } from 'react-hot-toast';
 import { queryConfig, environmentConfig } from '../services/config/api.config';
-import { useWebSocketConnection } from '../services/websocket';
+import {
+  useWebSocketConnection,
+  useWebSocketService,
+} from '../services/websocket';
+import {
+  CustomerAPIService,
+  ModuleAPIService,
+  AnalyticsAPIService,
+} from '../services/api';
 import { ErrorHandler } from '../services/errors';
 import { createLogger } from '@agent-desktop/logging';
 
 const errorLogger = createLogger('ccp-admin:api-error-boundary');
+
+export interface APIContextValue {
+  customerAPI: CustomerAPIService | null;
+  modulesAPI: ModuleAPIService | null;
+  analyticsAPI: AnalyticsAPIService | null;
+  websocket: ReturnType<typeof useWebSocketService> | null;
+  isConnected: boolean;
+  connect: (url?: string) => Promise<void>;
+  disconnect: () => void;
+}
+
+export const APIContext = React.createContext<APIContextValue>({
+  get customerAPI() {
+    throw new Error('APIContext must be used within an APIProvider');
+  },
+  get modulesAPI() {
+    throw new Error('APIContext must be used within an APIProvider');
+  },
+  get analyticsAPI() {
+    throw new Error('APIContext must be used within an APIProvider');
+  },
+  get websocket() {
+    throw new Error('APIContext must be used within an APIProvider');
+  },
+  get isConnected() {
+    throw new Error('APIContext must be used within an APIProvider');
+  },
+  async connect() {
+    throw new Error('APIContext must be used within an APIProvider');
+  },
+  disconnect() {
+    throw new Error('APIContext must be used within an APIProvider');
+  },
+});
 
 /**
  * Create React Query client with custom configuration
@@ -234,12 +280,67 @@ function ConnectionStatusIndicator() {
 export function APIProvider({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => createQueryClient());
 
+  const [customerAPI] = useState<CustomerAPIService | null>(() => {
+    try {
+      return new CustomerAPIService();
+    } catch (error) {
+      console.error(error);
+      return null;
+    }
+  });
+
+  const [modulesAPI] = useState<ModuleAPIService | null>(() => {
+    try {
+      return new ModuleAPIService();
+    } catch (error) {
+      console.error(error);
+      return null;
+    }
+  });
+
+  const [analyticsAPI] = useState<AnalyticsAPIService | null>(() => {
+    try {
+      return new AnalyticsAPIService();
+    } catch (error) {
+      console.error(error);
+      return null;
+    }
+  });
+
+  const websocket = useWebSocketService();
+  const { isConnected } = useWebSocketConnection();
+
+  const connect = React.useCallback(
+    async (url?: string) => {
+      await websocket.connect(url as any);
+    },
+    [websocket]
+  );
+
+  const disconnect = React.useCallback(() => {
+    websocket.disconnect();
+  }, [websocket]);
+
+  const contextValue = useMemo<APIContextValue>(
+    () => ({
+      customerAPI,
+      modulesAPI,
+      analyticsAPI,
+      websocket,
+      isConnected,
+      connect,
+      disconnect,
+    }),
+    [customerAPI, modulesAPI, analyticsAPI, websocket, isConnected, connect, disconnect]
+  );
+
   return (
-    <APIErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <WebSocketManager>
-          {children}
-          <ConnectionStatusIndicator />
+    <APIContext.Provider value={contextValue}>
+      <APIErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <WebSocketManager>
+            {children}
+            <ConnectionStatusIndicator />
 
           {/* Toast notifications */}
           <Toaster
@@ -285,6 +386,7 @@ export function APIProvider({ children }: { children: React.ReactNode }) {
         </WebSocketManager>
       </QueryClientProvider>
     </APIErrorBoundary>
+    </APIContext.Provider>
   );
 }
 
