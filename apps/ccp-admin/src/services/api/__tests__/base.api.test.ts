@@ -3,7 +3,8 @@
  * @module services/api/__tests__/base.api
  */
 
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import axios from 'axios';
+import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { BaseAPIService } from '../base.api';
 import { APIError } from '../../errors';
 
