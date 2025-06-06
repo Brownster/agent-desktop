@@ -18,6 +18,7 @@ import type {
   AnalyticsChart,
   SystemHealthResponse,
   AuditLogResponse,
+  AuditLogEntry,
 } from '../types/responses.types';
 
 /**
@@ -301,17 +302,22 @@ export class AnalyticsAPIService extends BaseAPIService {
 
     const params = this.buildAuditLogFilters(filters);
 
-    return this.getPaginated<AuditLogResponse['items']>(
+    const paginatedItemsResponse = await this.getPaginated<AuditLogEntry>(
       `${this.baseEndpoint}/audit/logs`,
       params
-    ).then(async (response) => {
-      // Enhance response with summary information
-      const summary = await this.getAuditLogSummary(filters);
-      return {
-        ...response,
-        summary,
-      } as AuditLogResponse;
-    });
+    );
+
+    const summary = await this.getAuditLogSummary(filters);
+
+    return {
+      items: paginatedItemsResponse.items,
+      total: paginatedItemsResponse.total,
+      page: paginatedItemsResponse.page,
+      pageSize: paginatedItemsResponse.pageSize,
+      hasNextPage: paginatedItemsResponse.hasNextPage,
+      hasPreviousPage: paginatedItemsResponse.hasPreviousPage,
+      summary,
+    };
   }
 
   /**
