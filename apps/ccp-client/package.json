@@ -36,7 +36,7 @@
     "react-hot-toast": "^2.4.1",
     "date-fns": "^2.30.0",
     "react-use": "^17.4.0",
-    "react-hotkeys-hook": "^4.4.1",
+    "react-hotkeys-hook": "^5.1.0",
     "amazon-connect-streams": "^2.11.2",
     "socket.io-client": "^4.7.2",
     "howler": "^2.2.4",
