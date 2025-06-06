@@ -41,6 +41,7 @@
     "socket.io-client": "^4.7.2",
     "howler": "^2.2.4",
     "amazon-connect-rtc-js": "workspace:*",
+    "amazon-connect-chat-js": "workspace:*",
     "@agent-desktop/types": "workspace:*",
     "@agent-desktop/config": "workspace:*",
     "@agent-desktop/logging": "workspace:*",
