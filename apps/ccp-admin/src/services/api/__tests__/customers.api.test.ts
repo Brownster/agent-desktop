@@ -3,8 +3,10 @@
  * @module services/api/__tests__/customers.api
  */
 
+import axios, { type AxiosInstance, type AxiosResponse } from 'axios';
 import { CustomerAPIService } from '../customers.api';
-import { BaseAPIService } from '../base.api';
+
+jest.mock('axios');
 import type {
   CreateCustomerRequest,
   UpdateCustomerRequest,
@@ -12,31 +14,38 @@ import type {
   CustomerFilters,
 } from '../../types';
 
-// Mock the base API service
-jest.mock('../base.api');
+
+const mockedAxios = axios as jest.Mocked<typeof axios>;
+const apiSuccess = <T>(data: T): AxiosResponse<{ success: true; data: T }> =>
+  ({
+    data: {
+      success: true,
+      data,
+      timestamp: new Date().toISOString(),
+      requestId: 'req_123',
+    },
+  } as AxiosResponse);
 
 describe('CustomerAPIService', () => {
   let service: CustomerAPIService;
-  let mockBaseService: jest.Mocked<BaseAPIService>;
+  let mockAxiosInstance: jest.Mocked<AxiosInstance>;
 
   beforeEach(() => {
-    // Clear all mocks
     jest.clearAllMocks();
 
-    // Create service instance
-    service = new CustomerAPIService();
+    mockAxiosInstance = {
+      get: jest.fn(),
+      post: jest.fn(),
+      put: jest.fn(),
+      patch: jest.fn(),
+      delete: jest.fn(),
+      interceptors: { request: { use: jest.fn() }, response: { use: jest.fn() } },
+      defaults: { headers: { common: {} }, baseURL: '' },
+    } as any;
 
-    // Get mock methods from the base service
-    mockBaseService = service as any;
-    mockBaseService.get = jest.fn();
-    mockBaseService.post = jest.fn();
-    mockBaseService.put = jest.fn();
-    mockBaseService.patch = jest.fn();
-    mockBaseService.delete = jest.fn();
-    mockBaseService.getPaginated = jest.fn();
-    mockBaseService.uploadFile = jest.fn();
-    mockBaseService.executeBulk = jest.fn();
-    mockBaseService.executeAnalytics = jest.fn();
+    mockedAxios.create.mockReturnValue(mockAxiosInstance);
+
+    service = new CustomerAPIService();
   });
 
   describe('getCustomers', () => {
@@ -66,22 +75,30 @@ describe('CustomerAPIService', () => {
         totalByPlan: { basic: 5, enterprise: 7 },
       };
 
-      mockBaseService.getPaginated.mockResolvedValue(mockResponse);
-      mockBaseService.get.mockResolvedValue(mockSummary);
+      mockAxiosInstance.get
+        .mockResolvedValueOnce(apiSuccess(mockResponse))
+        .mockResolvedValueOnce(apiSuccess(mockSummary));
 
       const result = await service.getCustomers(filters);
 
-      expect(mockBaseService.getPaginated).toHaveBeenCalledWith(
+      expect(mockAxiosInstance.get).toHaveBeenNthCalledWith(
+        1,
         '/api/v1/customers',
         {
-          search: 'acme',
-          status: 'active',
-          page: 1,
-          pageSize: 25,
-          sortBy: undefined,
-          sortOrder: undefined,
-          plan: undefined,
+          params: {
+            search: 'acme',
+            status: 'active',
+            page: 1,
+            pageSize: 25,
+            sortBy: undefined,
+            sortOrder: undefined,
+            plan: undefined,
+          },
         }
+      );
+      expect(mockAxiosInstance.get).toHaveBeenNthCalledWith(
+        2,
+        '/api/v1/customers/summary'
       );
 
       expect(result).toEqual({
@@ -100,16 +117,23 @@ describe('CustomerAPIService', () => {
         hasPreviousPage: false,
       };
 
-      mockBaseService.getPaginated.mockResolvedValue(mockResponse);
-      mockBaseService.get.mockResolvedValue({
-        totalActive: 0,
-        totalInactive: 0,
-        totalByPlan: {},
-      });
+      mockAxiosInstance.get
+        .mockResolvedValueOnce(apiSuccess(mockResponse))
+        .mockResolvedValueOnce(
+          apiSuccess({ totalActive: 0, totalInactive: 0, totalByPlan: {} })
+        );
 
       const result = await service.getCustomers();
 
-      expect(mockBaseService.getPaginated).toHaveBeenCalledWith('/api/v1/customers', {});
+      expect(mockAxiosInstance.get).toHaveBeenNthCalledWith(
+        1,
+        '/api/v1/customers',
+        { params: {} }
+      );
+      expect(mockAxiosInstance.get).toHaveBeenNthCalledWith(
+        2,
+        '/api/v1/customers/summary'
+      );
     });
   });
 
@@ -124,17 +148,17 @@ describe('CustomerAPIService', () => {
         activity: [],
       };
 
-      mockBaseService.get.mockResolvedValue(mockCustomer);
+      mockAxiosInstance.get.mockResolvedValue(apiSuccess(mockCustomer));
 
       const result = await service.getCustomer(customerId);
 
-      expect(mockBaseService.get).toHaveBeenCalledWith('/api/v1/customers/cust_123');
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/v1/customers/cust_123');
       expect(result).toEqual(mockCustomer);
     });
 
     it('should throw error for empty customer ID', async () => {
       await expect(service.getCustomer('')).rejects.toThrow('Customer ID is required');
-      expect(mockBaseService.get).not.toHaveBeenCalled();
+      expect(mockAxiosInstance.get).not.toHaveBeenCalled();
     });
   });
 
@@ -228,11 +252,11 @@ describe('CustomerAPIService', () => {
         deployment: {} as any,
       };
 
-      mockBaseService.post.mockResolvedValue(mockResponse);
+      mockAxiosInstance.post.mockResolvedValue(apiSuccess(mockResponse));
 
       const result = await service.createCustomer(customerData);
 
-      expect(mockBaseService.post).toHaveBeenCalledWith('/api/v1/customers', customerData);
+      expect(mockAxiosInstance.post).toHaveBeenCalledWith('/api/v1/customers', customerData);
       expect(result).toEqual(mockResponse);
     });
 
@@ -243,7 +267,7 @@ describe('CustomerAPIService', () => {
       } as CreateCustomerRequest;
 
       await expect(service.createCustomer(invalidData)).rejects.toThrow('Customer name is required');
-      expect(mockBaseService.post).not.toHaveBeenCalled();
+      expect(mockAxiosInstance.post).not.toHaveBeenCalled();
     });
 
     it('should validate plan field', async () => {
@@ -253,7 +277,7 @@ describe('CustomerAPIService', () => {
       } as CreateCustomerRequest;
 
       await expect(service.createCustomer(invalidData)).rejects.toThrow('Invalid plan');
-      expect(mockBaseService.post).not.toHaveBeenCalled();
+      expect(mockAxiosInstance.post).not.toHaveBeenCalled();
     });
   });
 
@@ -272,11 +296,11 @@ describe('CustomerAPIService', () => {
         updatedAt: new Date(),
       };
 
-      mockBaseService.patch.mockResolvedValue(mockResponse);
+      mockAxiosInstance.patch.mockResolvedValue(apiSuccess(mockResponse));
 
       const result = await service.updateCustomer(customerId, updates);
 
-      expect(mockBaseService.patch).toHaveBeenCalledWith(
+      expect(mockAxiosInstance.patch).toHaveBeenCalledWith(
         '/api/v1/customers/cust_123',
         updates
       );
@@ -285,7 +309,7 @@ describe('CustomerAPIService', () => {
 
     it('should throw error for empty customer ID', async () => {
       await expect(service.updateCustomer('', {})).rejects.toThrow('Customer ID is required');
-      expect(mockBaseService.patch).not.toHaveBeenCalled();
+      expect(mockAxiosInstance.patch).not.toHaveBeenCalled();
     });
   });
 
@@ -293,16 +317,16 @@ describe('CustomerAPIService', () => {
     it('should delete customer by ID', async () => {
       const customerId = 'cust_123';
 
-      mockBaseService.delete.mockResolvedValue(undefined);
+      mockAxiosInstance.delete.mockResolvedValue(apiSuccess(null));
 
       await service.deleteCustomer(customerId);
 
-      expect(mockBaseService.delete).toHaveBeenCalledWith('/api/v1/customers/cust_123');
+      expect(mockAxiosInstance.delete).toHaveBeenCalledWith('/api/v1/customers/cust_123');
     });
 
     it('should throw error for empty customer ID', async () => {
       await expect(service.deleteCustomer('')).rejects.toThrow('Customer ID is required');
-      expect(mockBaseService.delete).not.toHaveBeenCalled();
+      expect(mockAxiosInstance.delete).not.toHaveBeenCalled();
     });
   });
 
@@ -319,11 +343,11 @@ describe('CustomerAPIService', () => {
           dependencies: [],
         };
 
-        mockBaseService.get.mockResolvedValue(mockModules);
+        mockAxiosInstance.get.mockResolvedValue(apiSuccess(mockModules));
 
         const result = await service.getCustomerModules(customerId);
 
-        expect(mockBaseService.get).toHaveBeenCalledWith('/api/v1/customers/cust_123/modules');
+        expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/v1/customers/cust_123/modules');
         expect(result).toEqual(mockModules);
       });
     });
@@ -340,11 +364,11 @@ describe('CustomerAPIService', () => {
           config,
         };
 
-        mockBaseService.post.mockResolvedValue(mockResponse);
+        mockAxiosInstance.post.mockResolvedValue(apiSuccess(mockResponse));
 
         const result = await service.enableModule(customerId, moduleId, config);
 
-        expect(mockBaseService.post).toHaveBeenCalledWith(
+        expect(mockAxiosInstance.post).toHaveBeenCalledWith(
           '/api/v1/customers/cust_123/modules/mod_456/enable',
           config
         );
@@ -355,7 +379,7 @@ describe('CustomerAPIService', () => {
         await expect(service.enableModule('', 'mod_123')).rejects.toThrow(
           'Customer ID and Module ID are required'
         );
-        expect(mockBaseService.post).not.toHaveBeenCalled();
+        expect(mockAxiosInstance.post).not.toHaveBeenCalled();
       });
     });
 
@@ -364,11 +388,11 @@ describe('CustomerAPIService', () => {
         const customerId = 'cust_123';
         const moduleId = 'mod_456';
 
-        mockBaseService.post.mockResolvedValue(undefined);
+        mockAxiosInstance.post.mockResolvedValue(apiSuccess(undefined));
 
         await service.disableModule(customerId, moduleId);
 
-        expect(mockBaseService.post).toHaveBeenCalledWith(
+        expect(mockAxiosInstance.post).toHaveBeenCalledWith(
           '/api/v1/customers/cust_123/modules/mod_456/disable'
         );
       });
@@ -384,11 +408,11 @@ describe('CustomerAPIService', () => {
           { type: 'zendesk', name: 'ZD Integration', enabled: false },
         ];
 
-        mockBaseService.get.mockResolvedValue(mockIntegrations);
+        mockAxiosInstance.get.mockResolvedValue(apiSuccess(mockIntegrations));
 
         const result = await service.getCustomerIntegrations(customerId);
 
-        expect(mockBaseService.get).toHaveBeenCalledWith('/api/v1/customers/cust_123/integrations');
+        expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/v1/customers/cust_123/integrations');
         expect(result).toEqual(mockIntegrations);
       });
     });
@@ -425,11 +449,11 @@ describe('CustomerAPIService', () => {
           enabled: true,
         };
 
-        mockBaseService.post.mockResolvedValue(mockResponse);
+        mockAxiosInstance.post.mockResolvedValue(apiSuccess(mockResponse));
 
         const result = await service.createIntegration(customerId, integrationData);
 
-        expect(mockBaseService.post).toHaveBeenCalledWith(
+        expect(mockAxiosInstance.post).toHaveBeenCalledWith(
           '/api/v1/customers/cust_123/integrations',
           integrationData
         );
@@ -446,7 +470,7 @@ describe('CustomerAPIService', () => {
         await expect(service.createIntegration(customerId, invalidData)).rejects.toThrow(
           'Integration name is required'
         );
-        expect(mockBaseService.post).not.toHaveBeenCalled();
+        expect(mockAxiosInstance.post).not.toHaveBeenCalled();
       });
     });
 
@@ -462,11 +486,11 @@ describe('CustomerAPIService', () => {
           timestamp: new Date(),
         };
 
-        mockBaseService.post.mockResolvedValue(mockTestResult);
+        mockAxiosInstance.post.mockResolvedValue(apiSuccess(mockTestResult));
 
         const result = await service.testIntegration(customerId, integrationId);
 
-        expect(mockBaseService.post).toHaveBeenCalledWith(
+        expect(mockAxiosInstance.post).toHaveBeenCalledWith(
           '/api/v1/customers/cust_123/integrations/int_456/test'
         );
         expect(result).toEqual(mockTestResult);
@@ -494,15 +518,18 @@ describe('CustomerAPIService', () => {
           timeRange,
         };
 
-        mockBaseService.executeAnalytics.mockResolvedValue(mockMetrics);
+        mockAxiosInstance.get.mockResolvedValue(apiSuccess(mockMetrics));
 
         const result = await service.getCustomerMetrics(customerId, timeRange);
 
-        expect(mockBaseService.executeAnalytics).toHaveBeenCalledWith(
+        expect(mockAxiosInstance.get).toHaveBeenCalledWith(
           '/api/v1/customers/cust_123/metrics',
           {
-            start: timeRange.start.toISOString(),
-            end: timeRange.end.toISOString(),
+            params: {
+              start: timeRange.start.toISOString(),
+              end: timeRange.end.toISOString(),
+            },
+            timeout: 60000,
           }
         );
         expect(result).toEqual(mockMetrics);
@@ -527,15 +554,18 @@ describe('CustomerAPIService', () => {
           timeRange,
         };
 
-        mockBaseService.executeAnalytics.mockResolvedValue(mockUsage);
+        mockAxiosInstance.get.mockResolvedValue(apiSuccess(mockUsage));
 
         const result = await service.getCustomerUsage(customerId, timeRange);
 
-        expect(mockBaseService.executeAnalytics).toHaveBeenCalledWith(
+        expect(mockAxiosInstance.get).toHaveBeenCalledWith(
           '/api/v1/customers/cust_123/usage',
           {
-            start: timeRange.start.toISOString(),
-            end: timeRange.end.toISOString(),
+            params: {
+              start: timeRange.start.toISOString(),
+              end: timeRange.end.toISOString(),
+            },
+            timeout: 60000,
           }
         );
         expect(result).toEqual(mockUsage);
@@ -569,13 +599,15 @@ describe('CustomerAPIService', () => {
           errors: [],
         };
 
-        mockBaseService.executeBulk.mockResolvedValue(mockResponse);
+        mockAxiosInstance.post.mockResolvedValue(apiSuccess(mockResponse));
 
         const result = await service.bulkUpdateCustomers(operations);
 
-        expect(mockBaseService.executeBulk).toHaveBeenCalledWith('/api/v1/customers/bulk', {
-          operations,
-        });
+        expect(mockAxiosInstance.post).toHaveBeenCalledWith(
+          '/api/v1/customers/bulk',
+          { operations },
+          expect.objectContaining({ timeout: 600000 })
+        );
         expect(result).toEqual(mockResponse);
       });
     });
@@ -593,11 +625,11 @@ describe('CustomerAPIService', () => {
           format,
         };
 
-        mockBaseService.post.mockResolvedValue(mockExportResponse);
+        mockAxiosInstance.post.mockResolvedValue(apiSuccess(mockExportResponse));
 
         const result = await service.exportCustomers(filters, format);
 
-        expect(mockBaseService.post).toHaveBeenCalledWith(
+        expect(mockAxiosInstance.post).toHaveBeenCalledWith(
           '/api/v1/customers/export',
           undefined,
           {
@@ -633,14 +665,14 @@ describe('CustomerAPIService', () => {
           progress: 0,
         };
 
-        mockBaseService.uploadFile.mockResolvedValue(mockImportResponse);
+        mockAxiosInstance.post.mockResolvedValue(apiSuccess(mockImportResponse));
 
         const result = await service.importCustomers(file, progressCallback);
 
-        expect(mockBaseService.uploadFile).toHaveBeenCalledWith(
+        expect(mockAxiosInstance.post).toHaveBeenCalledWith(
           '/api/v1/customers/import',
-          file,
-          progressCallback
+          expect.any(FormData),
+          expect.objectContaining({ onUploadProgress: expect.any(Function) })
         );
         expect(result).toEqual(mockImportResponse);
       });
