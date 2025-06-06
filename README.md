@@ -87,15 +87,15 @@ cd agent-desktop
 pnpm install
 
 # Start development server
-pnpm nx serve ccp-client
+pnpm nx run @agent-desktop/ccp-client:dev
 ```
 
 ### Development Commands
 
 ```bash
 # Development
-pnpm nx serve ccp-client          # Start CCP client
-pnpm nx serve ccp-admin           # Start admin dashboard
+pnpm nx run @agent-desktop/ccp-client:dev          # Start CCP client
+pnpm nx run @agent-desktop/ccp-admin:dev           # Start admin dashboard
 
 # Building
 pnpm nx build ccp-client          # Build CCP client

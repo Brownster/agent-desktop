@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Dashboard metrics and activity now load from API hooks `useAnalyticsDashboard` and `useAuditLogs`
 - Customers page fetches data via `useCustomers` instead of static mock data
+- Updated development commands to use `nx run @agent-desktop/ccp-client:dev` and `nx run @agent-desktop/ccp-admin:dev`
+- Added `amazon-connect-chat-js` workspace dependency for CCP client tests
 
 ## [0.1.0] - 2024-01-20
 

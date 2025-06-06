@@ -64,8 +64,8 @@ pnpm install --frozen-lockfile  # Install with exact versions (CI)
 
 **Development:**
 ```bash
-pnpm nx serve ccp-client     # Start CCP client development server
-pnpm nx serve ccp-admin      # Start admin dashboard development server
+pnpm nx run @agent-desktop/ccp-client:dev     # Start CCP client development server
+pnpm nx run @agent-desktop/ccp-admin:dev      # Start admin dashboard development server
 pnpm nx build ccp-client     # Build CCP client application
 pnpm nx build ccp-admin      # Build admin dashboard
 ```

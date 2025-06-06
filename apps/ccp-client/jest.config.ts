@@ -13,5 +13,6 @@ module.exports = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^amazon-connect-rtc-js$': '<rootDir>/src/__mocks__/amazon-connect-rtc-js.ts',
+    '^amazon-connect-chat-js$': '<rootDir>/../../libs/amazon-connect-chat-js/src/index.ts',
   },
 };

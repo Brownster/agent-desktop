@@ -27,8 +27,8 @@
     "format:write": "prettier --write .",
     "security:audit": "pnpm audit --audit-level=high",
     "security:scan": "nx run-many --target=security-scan --all",
-    "dev": "nx serve ccp-client",
-    "dev:admin": "nx serve ccp-admin",
+    "dev": "nx run @agent-desktop/ccp-client:dev",
+    "dev:admin": "nx run @agent-desktop/ccp-admin:dev",
     "clean": "nx reset && rm -rf node_modules",
     "prepare": "husky install",
     "module:publish": "ts-node tools/module-publish.ts"

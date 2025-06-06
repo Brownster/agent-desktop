@@ -2,7 +2,7 @@
  * @fileoverview Tests for AgentStatus component
  */
 
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import AgentStatus from './AgentStatus';
 import { useAgentStore } from '@/store/agent.store';
@@ -101,7 +101,8 @@ describe('AgentStatus', () => {
     
     expect(screen.getByText('Routing Profile')).toBeInTheDocument();
     expect(screen.getByText('Basic Routing Profile')).toBeInTheDocument();
-    expect(screen.getByText('Queues: 2')).toBeInTheDocument();
+    const queuesElement = screen.getByText('Queues:', { exact: false }).parentElement;
+    expect(queuesElement).toHaveTextContent(/Queues:\s*2/);
   });
 
   it('should show state duration when state start time is available', () => {
@@ -111,19 +112,18 @@ describe('AgentStatus', () => {
     expect(screen.getByText(/in Available/)).toBeInTheDocument();
   });
 
-  it('should call onStateChange when a state is selected', () => {
+  it('should call onStateChange when a state is selected', async () => {
     const mockOnStateChange = jest.fn();
     render(<AgentStatus onStateChange={mockOnStateChange} />);
     
     // Click the state dropdown
     const stateButton = screen.getByRole('button', { name: /Available/i });
     fireEvent.click(stateButton);
-    
-    // Click on Available option (should be visible in the dropdown)
-    const availableOption = screen.getByRole('button', { name: /Available/ });
+
+    const availableOption = await screen.findByRole('menuitem', { name: 'Available' });
     fireEvent.click(availableOption);
-    
-    expect(mockOnStateChange).toHaveBeenCalledWith('Available');
+
+    expect(mockOnStateChange).toHaveBeenCalledWith('Available', undefined);
   });
 
   it('should display unavailable reasons in dropdown', () => {

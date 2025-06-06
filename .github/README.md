@@ -77,7 +77,7 @@ cd agent-desktop
 pnpm install
 
 # Start development
-pnpm nx serve ccp-client
+pnpm nx run @agent-desktop/ccp-client:dev
 ```
 
 ## 🤝 Contributing
