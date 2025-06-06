@@ -250,13 +250,13 @@ export abstract class BaseAPIService {
   /**
    * GET request with pagination support
    */
-  protected async getPaginated<T>(
+  protected async getPaginated<ItemType>(
     endpoint: string,
     params?: Record<string, unknown>,
     config?: AxiosRequestConfig
-  ): Promise<PaginatedResponse<T>> {
+  ): Promise<PaginatedResponse<ItemType>> {
     try {
-      const response = await this.client.get<APIResponse<PaginatedResponse<T>>>(
+      const response = await this.client.get<APIResponse<PaginatedResponse<ItemType>>>(
         endpoint,
         {
           ...config,
